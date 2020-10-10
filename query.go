@@ -24,8 +24,6 @@ type Accepter interface {
 	fmt.Stringer
 }
 
-const qPattern = "query(%s, kind: %s, depth: %s, select: %v, match: %v, next: %v)"
-
 type Queryer interface {
 	Select(interface{}) (interface{}, error)
 }
@@ -46,11 +44,11 @@ func (qs Queryset) Select(ifi interface{}) (interface{}, error) {
 
 type Query struct {
 	choices []Accepter
-	kind    rune // option, regular, array
-	depth   rune // one level, any levels
-	match   Matcher
-	get     Selector
-	next    Queryer
+	// kind    rune // option, regular, array
+	depth rune // one level, any levels
+	match Matcher
+	get   Selector
+	next  Queryer
 }
 
 func (q Query) Select(ifi interface{}) (interface{}, error) {
@@ -228,21 +226,10 @@ func (q Query) applyMatcher(ifi interface{}) (interface{}, error) {
 	return ifi, nil
 }
 
+const qPattern = "query(%s, depth: %s, select: %v, match: %v, next: %v)"
+
 func (q Query) String() string {
-	var (
-		kind  string
-		depth string
-	)
-	switch q.kind {
-	case TokValue:
-		kind = "value"
-	case TokRegular:
-		kind = "regular"
-	case TokArray:
-		kind = "array"
-	default:
-		kind = "any"
-	}
+	var depth string
 	switch q.depth {
 	case TokLevelOne:
 		depth = "current"
@@ -253,5 +240,5 @@ func (q Query) String() string {
 	for _, c := range q.choices {
 		cs = append(cs, c.String())
 	}
-	return fmt.Sprintf(qPattern, strings.Join(cs, "|"), kind, depth, q.get, q.match, q.next)
+	return fmt.Sprintf(qPattern, strings.Join(cs, "|"), depth, q.get, q.match, q.next)
 }
