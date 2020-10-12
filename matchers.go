@@ -7,6 +7,19 @@ import (
 	"time"
 )
 
+type CastError struct {
+	value interface{}
+	kind  string
+}
+
+func (e CastError) Error() string {
+	return fmt.Sprintf("%v: fail to cast to %s", e.value, e.kind)
+}
+
+func castError(k string, v interface{}) error {
+	return CastError{value: v, kind: k}
+}
+
 type Infix struct {
 	left  Matcher
 	right Matcher
@@ -44,6 +57,19 @@ func (i Infix) Match(doc map[string]interface{}) (bool, error) {
 	default:
 		return false, fmt.Errorf("unknown relational operator")
 	}
+}
+
+type Has struct {
+	option string
+}
+
+func (h Has) String() string {
+	return fmt.Sprintf("has(%s)", h.option)
+}
+
+func (h Has) Match(doc map[string]interface{}) (bool, error) {
+	_, ok := doc[h.option]
+	return ok, nil
 }
 
 type Expr struct {
@@ -84,63 +110,79 @@ func (e Expr) Match(doc map[string]interface{}) (bool, error) {
 	if !ok {
 		return ok, fmt.Errorf("%s: option not found", e.option)
 	}
+
+	switch es := e.value.(type) {
+	case []interface{}:
+		for _, v := range es {
+			ok, err := e.test(v, value)
+			if ok || err != nil {
+				return ok, err
+			}
+		}
+		return false, nil
+	default:
+		return e.test(e.value, value)
+	}
+}
+
+func (e Expr) test(want, got interface{}) (bool, error) {
 	switch e.op {
 	case TokMatch:
-		return e.match(value)
+		return isMatch(want, got)
 	case TokEqual:
-		return e.isEqual(value)
+		return isEqual(want, got)
 	case TokNotEqual:
-		ok, err := e.isEqual(value)
+		ok, err := isEqual(want, got)
 		return !ok, err
 	case TokLesser:
-		return e.isLess(value)
+		return isLess(want, got)
 	case TokLessEq:
-		eq, err := e.isEqual(value)
+		eq, err := isEqual(want, got)
 		if err != nil {
 			return eq, err
 		}
-		le, err := e.isLess(value)
+		le, err := isLess(want, got)
 		if err != nil {
 			return le, err
 		}
 		return eq || le, nil
 	case TokGreater:
-		eq, err := e.isEqual(value)
+		eq, err := isEqual(want, got)
 		if err != nil {
 			return eq, err
 		}
-		le, err := e.isLess(value)
+		le, err := isLess(want, got)
 		if err != nil {
 			return le, err
 		}
 		return !eq && !le, nil
 	case TokGreatEq:
-		eq, err := e.isEqual(value)
+		eq, err := isEqual(want, got)
 		if err != nil {
 			return eq, err
 		}
-		le, err := e.isLess(value)
+		le, err := isLess(want, got)
 		if err != nil {
 			return le, err
 		}
 		return eq || !le, nil
 	case TokContains:
-		return e.contains(value)
+		return contains(want, got)
 	case TokStartsWith:
-		return e.startsWith(value)
+		return startsWith(want, got)
 	case TokEndsWith:
-		return e.endsWith(value)
+		return endsWith(want, got)
 	default:
 	}
 	return false, nil
 }
 
-func (e Expr) match(value interface{}) (bool, error) {
+func isMatch(want, got interface{}) (bool, error) {
 	var (
-		pat = e.value.(string)
+		pat = want.(string)
 		str string
 	)
-	switch v := value.(type) {
+	switch v := got.(type) {
 	case int64:
 		str = strconv.FormatInt(v, 10)
 	case float64:
@@ -152,124 +194,111 @@ func (e Expr) match(value interface{}) (bool, error) {
 	case time.Time:
 		str = v.Format(time.RFC3339)
 	default:
-		return false, fmt.Errorf("%v: can not be converted to string", value)
+		return false, fmt.Errorf("%v: can not be converted to string", got)
 	}
 	return Match(pat, str), nil
 }
 
-func (e Expr) contains(value interface{}) (bool, error) {
-	val, ok := e.value.(string)
+func contains(want, got interface{}) (bool, error) {
+	val, ok := got.(string)
 	if !ok {
-		return false, fmt.Errorf("%s: option can not be cast to string", e.option)
+		return false, fmt.Errorf("%v: option can not be cast to string", got)
 	}
-	other, ok := value.(string)
+	other, ok := want.(string)
 	if !ok {
-		return false, fmt.Errorf("%v: can not be cast to string", value)
+		return false, fmt.Errorf("%v: can not be cast to string", want)
 	}
 	return strings.Contains(val, other), nil
 }
 
-func (e Expr) startsWith(value interface{}) (bool, error) {
-	val, ok := e.value.(string)
+func startsWith(want, got interface{}) (bool, error) {
+	val, ok := got.(string)
 	if !ok {
-		return false, fmt.Errorf("%s: option can not be cast to string", e.option)
+		return false, fmt.Errorf("%v: option can not be cast to string", got)
 	}
-	other, ok := value.(string)
+	other, ok := want.(string)
 	if !ok {
-		return false, fmt.Errorf("%v: can not be cast to string", value)
+		return false, fmt.Errorf("%v: can not be cast to string", want)
 	}
 	return strings.HasPrefix(val, other), nil
 }
 
-func (e Expr) endsWith(value interface{}) (bool, error) {
-	val, ok := e.value.(string)
+func endsWith(want, got interface{}) (bool, error) {
+	val, ok := got.(string)
 	if !ok {
-		return false, fmt.Errorf("%s: option can not be cast to string", e.option)
+		return false, fmt.Errorf("%v: option can not be cast to string", got)
 	}
-	other, ok := value.(string)
+	other, ok := want.(string)
 	if !ok {
-		return false, fmt.Errorf("%v: can not be cast to string", value)
+		return false, fmt.Errorf("%v: can not be cast to string", want)
 	}
 	return strings.HasSuffix(val, other), nil
 }
 
-func (e Expr) isEqual(value interface{}) (bool, error) {
-	switch val := e.value.(type) {
+func isEqual(want, got interface{}) (bool, error) {
+	switch val := got.(type) {
 	case string:
-		other, ok := value.(string)
+		other, ok := want.(string)
 		if !ok {
-			return false, fmt.Errorf("%s(%v): can not be casted to string", e.option, value)
+			return false, fmt.Errorf("%v: can not be casted to string", want)
 		}
 		return val == other, nil
 	case int64:
-		other, ok := value.(int64)
+		other, ok := want.(int64)
 		if !ok {
-			return false, fmt.Errorf("%s(%v): can not be casted to integer", e.option, value)
+			return false, fmt.Errorf("%v: can not be casted to integer", want)
 		}
 		return val == other, nil
 	case float64:
-		other, ok := value.(float64)
+		other, ok := want.(float64)
 		if !ok {
-			return false, fmt.Errorf("%s(%v): can not be casted to float", e.option, value)
+			return false, fmt.Errorf("%v: can not be casted to float", want)
 		}
 		return val == other, nil
 	case bool:
-		other, ok := value.(bool)
+		other, ok := want.(bool)
 		if !ok {
-			return false, fmt.Errorf("%s(%v): can not be casted to boolean", e.option, value)
+			return false, fmt.Errorf("%v: can not be casted to boolean", want)
 		}
 		return val == other, nil
 	case time.Time:
-		other, ok := value.(time.Time)
+		other, ok := want.(time.Time)
 		if !ok {
-			return false, fmt.Errorf("%s(%v): can not be casted to time", e.option, value)
+			return false, fmt.Errorf("%v: can not be casted to time", want)
 		}
 		return val.Equal(other), nil
 	}
 	return false, nil
 }
 
-func (e Expr) isLess(value interface{}) (bool, error) {
-	switch val := e.value.(type) {
+func isLess(want, got interface{}) (bool, error) {
+	switch val := got.(type) {
 	case string:
-		other, ok := value.(string)
+		other, ok := want.(string)
 		if !ok {
-			return false, fmt.Errorf("%s(%v): can not be casted to string", e.option, value)
+			return false, fmt.Errorf("%v: can not be casted to string", want)
 		}
 		return strings.Compare(other, val) < 0, nil
 	case int64:
-		other, ok := value.(int64)
+		other, ok := want.(int64)
 		if !ok {
-			return false, fmt.Errorf("%s(%v): can not be casted to integer", e.option, value)
+			return false, fmt.Errorf("%v: can not be casted to integer", want)
 		}
 		return other < val, nil
 	case float64:
-		other, ok := value.(float64)
+		other, ok := want.(float64)
 		if !ok {
-			return false, fmt.Errorf("%s(%v): can not be casted to float", e.option, value)
+			return false, fmt.Errorf("%v: can not be casted to float", want)
 		}
 		return other < val, nil
 	case bool:
 		return false, fmt.Errorf("booleans can only be compared for equality")
 	case time.Time:
-		other, ok := value.(time.Time)
+		other, ok := want.(time.Time)
 		if !ok {
-			return false, fmt.Errorf("%s(%v): can not be casted to time", e.option, value)
+			return false, fmt.Errorf("%v: can not be casted to time", want)
 		}
 		return other.Before(val), nil
 	}
 	return false, nil
-}
-
-type Has struct {
-	option string
-}
-
-func (h Has) String() string {
-	return fmt.Sprintf("has(%s)", h.option)
-}
-
-func (h Has) Match(doc map[string]interface{}) (bool, error) {
-	_, ok := doc[h.option]
-	return ok, nil
 }

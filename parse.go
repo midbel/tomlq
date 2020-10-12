@@ -1,10 +1,30 @@
 package query
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
 )
+
+var ErrEmpty = errors.New("empty queryset")
+
+type ParseError struct {
+	tok  Token
+	ctx  string
+	want string
+}
+
+func (e ParseError) Error() string {
+	return fmt.Sprintf("%s: unexpected token %s", e.ctx, e.tok)
+}
+
+func parseError(where string, tok Token) error {
+	return ParseError{
+		tok: tok,
+		ctx: where,
+	}
+}
 
 type Parser struct {
 	scan *Scanner
@@ -69,7 +89,7 @@ func (p *Parser) parse() (Queryer, error) {
 	var q Queryer
 	switch len(qs) {
 	case 0:
-		return nil, fmt.Errorf("empty queryset")
+		return nil, ErrEmpty
 	case 1:
 		q = qs[0]
 	default:
