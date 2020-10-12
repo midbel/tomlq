@@ -9,7 +9,7 @@ func TestParse(t *testing.T) {
 		"foo",
 		"/?[a-z]*/",
 		"foo.bar",
-		"..foo.bar",
+		"..foo.(1234, /[a-z][a-z][a-z][a-z]/)",
 		"..$(foo,bar).%bar:number",
 		"..@foo:first",
 		"..@\"foo\":at(5)",
