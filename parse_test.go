@@ -280,20 +280,21 @@ func testQuery(t *testing.T, pc ParseCase) {
 func testSimpleQuery(t *testing.T, q Query, pc ParseCase) {
 	t.Helper()
 	if q.depth != pc.Depth {
-		t.Errorf("depth mismatched! want %02x, got %02x", pc.Depth, q.depth)
+		t.Errorf("%s: depth mismatched! want %02x, got %02x", pc.Input, pc.Depth, q.depth)
 	}
 	if !reflect.DeepEqual(q.choices, pc.Choices) {
-		t.Errorf("choices mismatched! want %v, got %v", pc.Choices, q.choices)
+		t.Errorf("%s: choices mismatched! want %v, got %v", pc.Input, pc.Choices, q.choices)
 	}
 	if !reflect.DeepEqual(q.get, pc.Selector) {
-		t.Errorf("selectors mismatched! want %v, got %v", pc.Selector, q.get)
+		t.Errorf("%s: selectors mismatched! want %v, got %v", pc.Input, pc.Selector, q.get)
 	}
 	if !reflect.DeepEqual(q.match, pc.Matcher) {
-		t.Errorf("matchers mismatched!")
-		t.Errorf("\twant: %v", pc.Matcher)
-		t.Errorf("\tgot:  %v", q.match)
+		t.Errorf("%s: matchers mismatched!", pc.Input)
+		t.Logf("\twant: %v", pc.Matcher)
+		t.Logf("\tgot:  %v", q.match)
 	}
 	if q, ok := q.next.(Query); ok && pc.Next != nil {
+		pc.Next.Input = pc.Input
 		testSimpleQuery(t, q, *pc.Next)
 	}
 }
