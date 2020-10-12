@@ -295,7 +295,7 @@ func (s *Scanner) scanDate() rune {
 	if !scan() {
 		return TokIllegal
 	}
-	if s.char == space || s.char == 'T' {
+	if (s.char == space || s.char == 'T') && isDigit(s.nextRune()) {
 		s.readRune()
 		if kind := s.scanTime(); kind == TokIllegal {
 			return kind
