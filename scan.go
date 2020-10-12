@@ -237,17 +237,20 @@ func (s *Scanner) scanNumber(tok *Token) {
 
 func (s *Scanner) scanFraction() rune {
 	s.readRune()
-	for isDigit(s.char) {
-		if s.char == underscore {
+	for !s.isDone() {
+		switch {
+		case s.char == underscore:
 			ok := isDigit(s.prevRune()) && isDigit(s.nextRune())
 			if !ok {
 				return TokIllegal
 			}
+		case isDigit(s.char):
+		case s.char == 'e' || s.char == 'E':
+			return s.scanExponent()
+		default:
+			return TokFloat
 		}
 		s.readRune()
-	}
-	if s.char == 'e' || s.char == 'E' {
-		return s.scanExponent()
 	}
 	return TokFloat
 }
