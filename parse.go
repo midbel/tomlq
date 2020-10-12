@@ -152,6 +152,47 @@ func (p *Parser) parseChoices() ([]Accepter, error) {
 }
 
 func (p *Parser) parseMatcher() (Matcher, error) {
+	var (
+		left Matcher
+		err  error
+	)
+	if p.curr.Type == TokBegGrp {
+		p.next()
+		left, err = p.parseMatcher()
+		if err == nil && p.curr.Type != TokEndGrp {
+			return nil, fmt.Errorf("expr: unexpected token %s, want )", p.curr)
+		}
+		p.next()
+	} else {
+		left, err = p.parseExpression()
+	}
+	if err != nil {
+		return nil, err
+	}
+	if p.curr.isRelation() {
+		i := Infix{
+			op:   p.curr.Type,
+			left: left,
+		}
+		p.next()
+		right, err := p.parseMatcher()
+		if err != nil {
+			return nil, err
+		}
+		i.right = right
+		return i, nil
+	}
+	switch p.curr.Type {
+	case TokEndExpr:
+		p.next()
+	case TokEndGrp:
+	default:
+		return nil, fmt.Errorf("expr: unexpected token %s, want rsquare|rparen", p.curr)
+	}
+	return left, err
+}
+
+func (p *Parser) parseExpression() (Matcher, error) {
 	var left Matcher
 	if !p.curr.isKey() {
 		return nil, fmt.Errorf("expr: unexpected token %s, want identifier", p.curr)
@@ -175,23 +216,6 @@ func (p *Parser) parseMatcher() (Matcher, error) {
 	} else {
 		left = Has{option: ident.Literal}
 	}
-	if p.curr.isRelation() {
-		i := Infix{
-			op:   p.curr.Type,
-			left: left,
-		}
-		p.next()
-		right, err := p.parseMatcher()
-		if err != nil {
-			return nil, err
-		}
-		i.right = right
-		return i, nil
-	}
-	if p.curr.Type != TokEndExpr {
-		return nil, fmt.Errorf("expr: unexpected token %s, want expr", p.curr)
-	}
-	p.next()
 	return left, nil
 }
 
@@ -257,8 +281,7 @@ func (p *Parser) parseValue(op rune) (interface{}, error) {
 		return val, err
 	}
 	if p.curr.isValue() {
-		val, err := do()
-		return []interface{}{val}, err
+		return do()
 	}
 	if p.curr.Type != TokBegGrp {
 		return nil, fmt.Errorf("value: unexpected token %s, want begin", p.curr)
