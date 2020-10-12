@@ -16,6 +16,16 @@ func TestScanner(t *testing.T) {
 			},
 		},
 		{
+			Input: "..foo,.bar",
+			Tokens: []Token{
+				createToken("", TokLevelAny),
+				createToken("foo", TokLiteral),
+				createToken("", TokComma),
+				createToken("", TokLevelOne),
+				createToken("bar", TokLiteral),
+			},
+		},
+		{
 			Input: ".foo",
 			Tokens: []Token{
 				createToken("", TokLevelOne),

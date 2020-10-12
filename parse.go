@@ -41,6 +41,11 @@ func (p *Parser) parse() (Queryer, error) {
 		switch p.curr.Type {
 		case TokComma:
 			p.next()
+			switch {
+			case p.curr.isKey() || p.curr.isLevel() || p.curr.isType():
+			default:
+				return nil, fmt.Errorf("parse: unexpected token %s", p.curr)
+			}
 		case TokEOF:
 		default:
 			return nil, fmt.Errorf("parse: unexpected token %s", p.curr)
