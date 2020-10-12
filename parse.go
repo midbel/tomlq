@@ -162,7 +162,7 @@ func (p *Parser) parseMatcher() (Matcher, error) {
 		e := Expr{option: ident.Literal}
 		e.op = p.curr.Type
 		p.next()
-		if !p.curr.isValue() {
+		if !p.curr.isValue() && p.curr.Type != TokBegGrp {
 			return nil, fmt.Errorf("expr: unexpected token %s, want value", p.curr)
 		}
 		value, err := p.parseValue(e.op)
@@ -216,44 +216,75 @@ var datestr = []string{
 }
 
 func (p *Parser) parseValue(op rune) (interface{}, error) {
-	var (
-		val interface{}
-		err error
-	)
-	if op == TokMatch && p.curr.Type != TokPattern {
-		return nil, fmt.Errorf("value: unexpected token %s, want pattern", p.curr)
-	}
-	switch p.curr.Type {
-	case TokPattern:
-		val = p.curr.Literal
-	case TokLiteral:
-		val = p.curr.Literal
-	case TokBool:
-		val, err = strconv.ParseBool(p.curr.Literal)
-	case TokFloat:
-		val, err = strconv.ParseFloat(p.curr.Literal, 64)
-	case TokInteger:
-		val, err = strconv.ParseInt(p.curr.Literal, 0, 64)
-	case TokTime:
-		for _, str := range timestr {
-			val, err = time.Parse(str, p.curr.Literal)
-			if err == nil {
-				break
-			}
+	do := func() (interface{}, error) {
+		var (
+			val interface{}
+			err error
+		)
+		if op == TokMatch && p.curr.Type != TokPattern {
+			return nil, fmt.Errorf("value: unexpected token %s, want pattern", p.curr)
 		}
-	case TokDate:
-		val, err = time.Parse("2006-01-02", p.curr.Literal)
-	case TokDateTime:
-		for _, str := range datestr {
-			val, err = time.Parse(str, p.curr.Literal)
-			if err == nil {
-				break
+		switch p.curr.Type {
+		case TokPattern:
+			val = p.curr.Literal
+		case TokLiteral:
+			val = p.curr.Literal
+		case TokBool:
+			val, err = strconv.ParseBool(p.curr.Literal)
+		case TokFloat:
+			val, err = strconv.ParseFloat(p.curr.Literal, 64)
+		case TokInteger:
+			val, err = strconv.ParseInt(p.curr.Literal, 0, 64)
+		case TokTime:
+			for _, str := range timestr {
+				val, err = time.Parse(str, p.curr.Literal)
+				if err == nil {
+					break
+				}
 			}
+		case TokDate:
+			val, err = time.Parse("2006-01-02", p.curr.Literal)
+		case TokDateTime:
+			for _, str := range datestr {
+				val, err = time.Parse(str, p.curr.Literal)
+				if err == nil {
+					break
+				}
+			}
+		default:
+			err = fmt.Errorf("unknown value type: %s", p.curr)
 		}
-	default:
-		err = fmt.Errorf("unknown value type: %s", p.curr)
+		return val, err
 	}
-	return val, err
+	if p.curr.isValue() {
+		val, err := do()
+		return []interface{}{val}, err
+	}
+	if p.curr.Type != TokBegGrp {
+		return nil, fmt.Errorf("value: unexpected token %s, want begin", p.curr)
+	}
+	p.next()
+
+	var values []interface{}
+	for !p.isDone() && p.curr.Type != TokEndGrp {
+		val, err := do()
+		if err != nil {
+			return nil, err
+		}
+		values = append(values, val)
+		p.next()
+		switch p.curr.Type {
+		case TokComma:
+			p.next()
+		case TokEndGrp:
+		default:
+			return nil, fmt.Errorf("value: unexpected token %s, want comma|end", p.curr)
+		}
+	}
+	if p.curr.Type != TokEndGrp {
+		return nil, fmt.Errorf("value: unexpected token %s, want end", p.curr)
+	}
+	return values, nil
 }
 
 func (p *Parser) parseSelector() (Selector, error) {

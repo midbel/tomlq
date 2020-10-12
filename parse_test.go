@@ -58,7 +58,7 @@ func TestParse(t *testing.T) {
 			Input: "foo[str && (str^=\"val\" || str$=\"lue\")]",
 		},
 		{
-			Input: "foo[int == (0, 10, 20)]",
+			Input: "foo[int == (30, 10, 20)]",
 		},
 	}
 	for _, d := range data {
