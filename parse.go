@@ -215,8 +215,10 @@ func (p *Parser) parseExpression() (Matcher, error) {
 	ident := p.curr
 	p.next()
 	if p.curr.isComparison() {
-		e := Expr{option: ident.Literal}
-		e.op = p.curr.Type
+		e := Expr{
+			option: ident.Literal,
+			op:     p.curr.Type,
+		}
 		p.next()
 		if !p.curr.isValue() && p.curr.Type != TokBegGrp {
 			return nil, fmt.Errorf("expr: unexpected token %s, want value", p.curr)
