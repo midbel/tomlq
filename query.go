@@ -44,8 +44,7 @@ func (qs Queryset) Select(ifi interface{}) (interface{}, error) {
 
 type Query struct {
 	choices []Accepter
-	// kind    rune // option, regular, array
-	depth rune // one level, any levels
+	depth rune
 	match Matcher
 	get   Selector
 	next  Queryer

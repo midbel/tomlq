@@ -6,6 +6,9 @@ import (
 )
 
 func Match(pattern, input string) bool {
+	if pattern == input {
+		return true
+	}
 	var (
 		pat = strings.NewReader(pattern)
 		str = strings.NewReader(input)
@@ -28,7 +31,11 @@ func Match(pattern, input string) bool {
 		default:
 			x, _, _ := str.ReadRune()
 			if x == backslash {
-				x, _, _ = str.ReadRune()
+				switch x, _, _ = str.ReadRune(); x {
+				case backslash, star, question, lsquare:
+				default:
+					str.UnreadRune()
+				}
 			}
 			if r != x {
 				return false
