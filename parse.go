@@ -10,6 +10,8 @@ type Parser struct {
 	scan *Scanner
 	curr Token
 	peek Token
+
+	selectors map[rune]func(rune) (Selector, error)
 }
 
 func Parse(str string) (Queryer, error) {
@@ -20,6 +22,19 @@ func Parse(str string) (Queryer, error) {
 func NewParser(str string) *Parser {
 	var p Parser
 	p.scan = NewScanner(str)
+	p.selectors = map[rune]func(rune) (Selector, error){
+		TokSelectFirst:  p.parseSelectSimple,
+		TokSelectLast:   p.parseSelectSimple,
+		TokSelectInt:    p.parseSelectSimple,
+		TokSelectFloat:  p.parseSelectSimple,
+		TokSelectNumber: p.parseSelectSimple,
+		TokSelectBool:   p.parseSelectSimple,
+		TokSelectString: p.parseSelectSimple,
+		TokSelectTruthy: p.parseSelectSimple,
+		TokSelectFalsy:  p.parseSelectSimple,
+		TokSelectAt:     p.parseSelectAt,
+		TokSelectRange:  p.parseSelectRange,
+	}
 	p.next()
 	p.next()
 
@@ -311,43 +326,38 @@ func (p *Parser) parseValue(op rune) (interface{}, error) {
 }
 
 func (p *Parser) parseSelector() (Selector, error) {
+	parse, ok := p.selectors[p.curr.Type]
+	if !ok {
+		return nil, fmt.Errorf("selector: unknown selector %s", p.curr.Literal)
+	}
+	curr := p.curr
+	p.next()
+	return parse(curr.Type)
+}
+
+func (p *Parser) parseSelectSimple(curr rune) (Selector, error) {
 	var (
 		get Selector
 		err error
 	)
-	switch p.curr.Type {
-	case TokSelectAt:
-		p.next()
-		get, err = p.parseSelectAt()
+	switch curr {
 	case TokSelectFirst:
-		p.next()
 		get = First{}
 	case TokSelectLast:
-		p.next()
 		get = Last{}
-	case TokSelectRange:
-		p.next()
-		get, err = p.parseSelectRange()
 	case TokSelectInt:
-		p.next()
 		get = Int{}
 	case TokSelectFloat:
-		p.next()
 		get = Float{}
 	case TokSelectNumber:
-		p.next()
 		get = Number{}
 	case TokSelectBool:
-		p.next()
 		get = Boolean{}
 	case TokSelectString:
-		p.next()
 		get = String{}
 	case TokSelectTruthy:
-		p.next()
 		get = Truthy{}
 	case TokSelectFalsy:
-		p.next()
 		get = Falsy{}
 	default:
 		err = fmt.Errorf("selector: unsupported token %s", p.curr)
@@ -355,7 +365,7 @@ func (p *Parser) parseSelector() (Selector, error) {
 	return get, err
 }
 
-func (p *Parser) parseSelectAt() (Selector, error) {
+func (p *Parser) parseSelectAt(_ rune) (Selector, error) {
 	var at At
 	if p.curr.Type != TokBegGrp {
 		return nil, fmt.Errorf("at: unexpected token %s, want lparen", p.curr)
@@ -375,7 +385,7 @@ func (p *Parser) parseSelectAt() (Selector, error) {
 	return at, nil
 }
 
-func (p *Parser) parseSelectRange() (Selector, error) {
+func (p *Parser) parseSelectRange(_ rune) (Selector, error) {
 	var rg Range
 	if p.curr.Type != TokBegGrp {
 		return nil, fmt.Errorf("range: unexpected token %s, want lparen", p.curr)
