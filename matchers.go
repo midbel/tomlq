@@ -1,11 +1,14 @@
 package query
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 )
+
+var ErrNotFound = errors.New("option not found")
 
 type CastError struct {
 	value interface{}
@@ -108,21 +111,24 @@ func (e Expr) String() string {
 func (e Expr) Match(doc map[string]interface{}) (bool, error) {
 	value, ok := doc[e.option]
 	if !ok {
-		return ok, fmt.Errorf("%s: option not found", e.option)
+		return ok, fmt.Errorf("%w: %s", ErrNotFound, e.option)
 	}
 
+	var err error
 	switch es := e.value.(type) {
 	case []interface{}:
-		for _, v := range es {
-			ok, err := e.test(v, value)
-			if ok || err != nil {
-				return ok, err
+		for i := range es {
+			if ok, err = e.test(es[i], value); ok {
+				break
 			}
 		}
-		return false, nil
 	default:
-		return e.test(e.value, value)
+		ok, err = e.test(e.value, value)
 	}
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", e.option, err)
+	}
+	return ok, nil
 }
 
 func (e Expr) test(want, got interface{}) (bool, error) {
@@ -194,7 +200,7 @@ func isMatch(want, got interface{}) (bool, error) {
 	case time.Time:
 		str = v.Format(time.RFC3339)
 	default:
-		return false, fmt.Errorf("%v: can not be converted to string", got)
+		return false, castError("string", got)
 	}
 	return Match(pat, str), nil
 }
@@ -202,11 +208,11 @@ func isMatch(want, got interface{}) (bool, error) {
 func contains(want, got interface{}) (bool, error) {
 	val, ok := got.(string)
 	if !ok {
-		return false, fmt.Errorf("%v: option can not be cast to string", got)
+		return false, castError("string", got)
 	}
 	other, ok := want.(string)
 	if !ok {
-		return false, fmt.Errorf("%v: can not be cast to string", want)
+		return false, castError("string", want)
 	}
 	return strings.Contains(val, other), nil
 }
@@ -214,11 +220,11 @@ func contains(want, got interface{}) (bool, error) {
 func startsWith(want, got interface{}) (bool, error) {
 	val, ok := got.(string)
 	if !ok {
-		return false, fmt.Errorf("%v: option can not be cast to string", got)
+		return false, castError("string", got)
 	}
 	other, ok := want.(string)
 	if !ok {
-		return false, fmt.Errorf("%v: can not be cast to string", want)
+		return false, castError("string", want)
 	}
 	return strings.HasPrefix(val, other), nil
 }
@@ -226,11 +232,11 @@ func startsWith(want, got interface{}) (bool, error) {
 func endsWith(want, got interface{}) (bool, error) {
 	val, ok := got.(string)
 	if !ok {
-		return false, fmt.Errorf("%v: option can not be cast to string", got)
+		return false, castError("string", got)
 	}
 	other, ok := want.(string)
 	if !ok {
-		return false, fmt.Errorf("%v: can not be cast to string", want)
+		return false, castError("string", want)
 	}
 	return strings.HasSuffix(val, other), nil
 }
@@ -240,31 +246,31 @@ func isEqual(want, got interface{}) (bool, error) {
 	case string:
 		other, ok := want.(string)
 		if !ok {
-			return false, fmt.Errorf("%v: can not be casted to string", want)
+			return false, castError("string", want)
 		}
 		return val == other, nil
 	case int64:
 		other, ok := want.(int64)
 		if !ok {
-			return false, fmt.Errorf("%v: can not be casted to integer", want)
+			return false, castError("integer", want)
 		}
 		return val == other, nil
 	case float64:
 		other, ok := want.(float64)
 		if !ok {
-			return false, fmt.Errorf("%v: can not be casted to float", want)
+			return false, castError("float", want)
 		}
 		return val == other, nil
 	case bool:
 		other, ok := want.(bool)
 		if !ok {
-			return false, fmt.Errorf("%v: can not be casted to boolean", want)
+			return false, castError("boolean", want)
 		}
 		return val == other, nil
 	case time.Time:
 		other, ok := want.(time.Time)
 		if !ok {
-			return false, fmt.Errorf("%v: can not be casted to time", want)
+			return false, castError("time", want)
 		}
 		return val.Equal(other), nil
 	}
@@ -276,18 +282,19 @@ func isLess(want, got interface{}) (bool, error) {
 	case string:
 		other, ok := want.(string)
 		if !ok {
-			return false, fmt.Errorf("%v: can not be casted to string", want)
+			return false, castError("string", want)
 		}
 		return strings.Compare(other, val) < 0, nil
 	case int64:
 		other, ok := want.(int64)
 		if !ok {
-			return false, fmt.Errorf("%v: can not be casted to integer", want)
+			return false, castError("integer", want)
 		}
 		return other < val, nil
 	case float64:
 		other, ok := want.(float64)
 		if !ok {
+			return false, castError("float", want)
 			return false, fmt.Errorf("%v: can not be casted to float", want)
 		}
 		return other < val, nil
@@ -296,7 +303,7 @@ func isLess(want, got interface{}) (bool, error) {
 	case time.Time:
 		other, ok := want.(time.Time)
 		if !ok {
-			return false, fmt.Errorf("%v: can not be casted to time", want)
+			return false, castError("time", want)
 		}
 		return other.Before(val), nil
 	}
