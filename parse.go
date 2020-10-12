@@ -66,7 +66,16 @@ func (p *Parser) parse() (Queryer, error) {
 			return nil, fmt.Errorf("parse: unexpected token %s", p.curr)
 		}
 	}
-	return Queryset(qs), nil
+	var q Queryer
+	switch len(qs) {
+	case 0:
+		return nil, fmt.Errorf("empty queryset")
+	case 1:
+		q = qs[0]
+	default:
+		q = Queryset(qs)
+	}
+	return q, nil
 }
 
 func (p *Parser) parseQuery() (Queryer, error) {
