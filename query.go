@@ -44,10 +44,10 @@ func (qs Queryset) Select(ifi interface{}) (interface{}, error) {
 
 type Query struct {
 	choices []Accepter
-	depth rune
-	match Matcher
-	get   Selector
-	next  Queryer
+	depth   rune
+	match   Matcher
+	get     Selector
+	next    Queryer
 }
 
 func (q Query) Select(ifi interface{}) (interface{}, error) {

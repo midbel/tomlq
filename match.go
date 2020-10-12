@@ -13,7 +13,7 @@ func Match(pattern, input string) bool {
 		pat = strings.NewReader(pattern)
 		str = strings.NewReader(input)
 	)
-	for pat.Len() > 0 && str.Len() > 0 {
+	for pat.Len() > 0 {
 		r, _, _ := pat.ReadRune()
 		switch r {
 		case star:
@@ -29,14 +29,15 @@ func Match(pattern, input string) bool {
 		case question:
 			str.ReadRune()
 		default:
-			x, _, _ := str.ReadRune()
-			if x == backslash {
-				switch x, _, _ = str.ReadRune(); x {
+			if r == backslash {
+				switch next, _, _ := pat.ReadRune(); next {
 				case backslash, star, question, lsquare:
+					r = next
 				default:
-					str.UnreadRune()
+					pat.UnreadRune()
 				}
 			}
+			x, _, _ := str.ReadRune()
 			if r != x {
 				return false
 			}
@@ -70,11 +71,11 @@ func rangeMatch(pat, str *strings.Reader) bool {
 	for !found && pat.Len() > 0 {
 		curr, _, _ := pat.ReadRune()
 		if curr == minus {
-			curr, _, _ = pat.ReadRune()
-			if !isRange(prev, curr) {
+			next, _, _ := pat.ReadRune()
+			if !isRange(prev, next) {
 				pat.UnreadRune()
 			} else {
-				found = want >= prev && want <= curr
+				found = want >= prev && want <= next
 				break
 			}
 		}
