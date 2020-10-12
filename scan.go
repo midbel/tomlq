@@ -208,7 +208,7 @@ func (s *Scanner) scanNumber(tok *Token) {
 		s.readRune()
 	}
 	var kind rune
-	for kind == 0 && !isBlank(s.char) && !isOperator(s.char) && s.char != rsquare {
+	for kind == 0 && !isBlank(s.char) && !isOperator(s.char) && s.char != rparen && s.char != rsquare {
 		switch s.char {
 		case dot:
 			kind = s.scanFraction()
@@ -490,6 +490,8 @@ func (s *Scanner) scanOperator(tok *Token) {
 		if s.char == pipe {
 			k = TokOr
 		}
+	case comma:
+		k = TokComma
 	}
 	s.readRune()
 	tok.Type = k
@@ -545,6 +547,11 @@ func (s *Scanner) readRune() {
 	s.char, s.curr, s.next = c, s.next, s.next+z
 }
 
+func (s *Scanner) unreadRune() {
+	s.next = s.curr
+	s.curr = s.curr - utf8.RuneLen(s.char)
+}
+
 func (s *Scanner) nextRune() rune {
 	c, _ := utf8.DecodeRune(s.buffer[s.next:])
 	return c
@@ -584,7 +591,7 @@ func isQuote(r rune) bool {
 func isOperator(r rune) bool {
 	return r == equal || r == bang || r == langle || r == rangle ||
 		r == ampersand || r == pipe || r == tilde || r == caret ||
-		r == dollar || r == star
+		r == dollar || r == star || r == comma
 }
 
 func isControl(r rune) bool {

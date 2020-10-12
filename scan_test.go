@@ -277,6 +277,23 @@ func TestScanner(t *testing.T) {
 				createToken("", TokEndExpr),
 			},
 		},
+		{
+			Input: "foo[int == (10, 0, 20)]",
+			Tokens: []Token{
+				createToken("foo", TokLiteral),
+				createToken("", TokBegExpr),
+				createToken("int", TokLiteral),
+				createToken("", TokEqual),
+				createToken("", TokBegGrp),
+				createToken("10", TokInteger),
+				createToken("", TokComma),
+				createToken("0", TokInteger),
+				createToken("", TokComma),
+				createToken("20", TokInteger),
+				createToken("", TokEndGrp),
+				createToken("", TokEndExpr),
+			},
+		},
 	}
 	for _, d := range data {
 		s := NewScanner(d.Input)
@@ -290,7 +307,7 @@ func TestScanner(t *testing.T) {
 				break
 			}
 			if want := d.Tokens[i]; !compareTokens(want, got) {
-				t.Errorf("tokens mismatched! want %s, got %s", want, got)
+				t.Errorf("%d: tokens mismatched! want %s, got %s", i, want, got)
 				break
 			}
 		}
