@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -30,8 +31,8 @@ func main() {
 		os.Exit(ExitBadQuery)
 	}
 
-	doc := make(map[string]interface{})
-	if err := toml.DecodeFile(flag.Arg(1), &doc); err != nil {
+	doc, err := decodeDocument(flag.Arg(1))
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(ExitBadDoc)
 	}
@@ -56,6 +57,25 @@ func main() {
 		print = withkey
 	}
 	printResults(strings.TrimSuffix(root, ".toml"), ifi, print)
+}
+
+func decodeDocument(file string) (map[string]interface{}, error) {
+	r, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+
+	var doc = make(map[string]interface{})
+	switch filepath.Ext(file) {
+	case ".toml":
+		err = toml.Decode(r, &doc)
+	case ".json":
+		err = json.NewDecoder(r).Decode(&doc)
+	default:
+		err = fmt.Errorf("%s: unsupported file type", filepath.Ext(file))
+	}
+	return doc, err
 }
 
 func nokey(_ string, value interface{}) {
