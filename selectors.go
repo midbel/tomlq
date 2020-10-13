@@ -78,7 +78,7 @@ type First struct{}
 func (_ First) Select(ifi interface{}) interface{} {
 	arr, ok := ifi.([]interface{})
 	if !ok || len(arr) == 0 {
-		return arr
+		return nil
 	}
 	return arr[:1]
 }
@@ -92,7 +92,7 @@ type Last struct{}
 func (_ Last) Select(ifi interface{}) interface{} {
 	arr, ok := ifi.([]interface{})
 	if !ok || len(arr) == 0 {
-		return arr
+		return nil
 	}
 	return arr[len(arr)-1:]
 }
@@ -133,7 +133,7 @@ func (r Range) Select(ifi interface{}) interface{} {
 	if r.start < r.end && r.end <= len(arr) {
 		return arr[r.start:r.end]
 	}
-	return arr
+	return nil
 }
 
 func (r Range) String() string {

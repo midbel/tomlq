@@ -6,67 +6,76 @@ import (
 	"time"
 )
 
+var admin = map[string]interface{}{
+	"name":  "midbel",
+	"email": "midbel@foobar.org",
+	"dob":   time.Date(2020, 10, 12, 14, 0, 0, 0, time.UTC),
+}
+
+var prime = map[string]interface{}{
+	"addr":   "10.10.1.1:10015",
+	"qn":     "prime.foobar.org",
+	"reboot": true,
+}
+
+var backup = map[string]interface{}{
+	"addr":   "10.10.1.15:10015",
+	"qn":     "backup.foobar.org",
+	"reboot": false,
+}
+
+var grp0 = map[string]interface{}{
+	"mode":  0,
+	"addr":  "239.192.0.1:31001",
+	"every": 60,
+}
+
+var client1 = map[string]interface{}{
+	"addr": "10.10.0.1:10001",
+	"tls":  false,
+	"cred": map[string]interface{}{
+		"user":   "user1",
+		"passwd": "temp123!",
+	},
+}
+
+var client2 = map[string]interface{}{
+	"addr": "10.10.0.2:10001",
+	"tls":  true,
+	"rps":  50,
+	"cred": map[string]interface{}{
+		"user":   "user2",
+		"passwd": "temp456!",
+	},
+}
+
+var client3 = map[string]interface{}{
+	"addr": "10.10.0.3:10001",
+	"tls":  true,
+	"rps":  50,
+	"cred": map[string]interface{}{
+		"user":   "user3",
+		"passwd": "temp123!",
+	},
+}
+
+var grp1 = map[string]interface{}{
+	"mode":  255,
+	"addr":  "224.0.0.1:31001",
+	"every": 30,
+}
+
 var doc = map[string]interface{}{
 	"service":   "foobar",
 	"instances": []interface{}{1, 2, 3},
-	"age":       3600,
-	"admin": map[string]interface{}{
-		"name":  "midbel",
-		"email": "midbel@foobar.org",
-		"dob":   time.Date(2020, 10, 12, 14, 0, 0, 0, time.UTC),
-	},
+	"age":       int64(3600),
+	"admin":     admin,
 	"servers": map[string]interface{}{
-		"groups": []interface{}{
-			map[string]interface{}{
-				"mode":  0,
-				"addr":  "239.192.0.1:31001",
-				"every": 60,
-			},
-			map[string]interface{}{
-				"mode":  255,
-				"addr":  "224.0.0.1:31001",
-				"every": 30,
-			},
-		},
-		"prime": map[string]interface{}{
-			"addr":   "10.10.1.1:10015",
-			"qn":     "prime.foobar.org",
-			"reboot": true,
-		},
-		"backup": map[string]interface{}{
-			"addr":   "10.10.1.15:10015",
-			"qn":     "backup.foobar.org",
-			"reboot": false,
-		},
+		"groups": []interface{}{grp0, grp1},
+		"prime":  prime,
+		"backup": backup,
 	},
-	"client": []interface{}{
-		map[string]interface{}{
-			"addr": "10.10.0.1:10001",
-			"tls":  false,
-			"cred": map[string]interface{}{
-				"user":   "user1",
-				"passwd": "temp123!",
-			},
-		},
-		map[string]interface{}{
-			"addr": "10.10.0.2:10001",
-			"tls":  true,
-			"rps":  50,
-			"cred": map[string]interface{}{
-				"user":   "user2",
-				"passwd": "temp456!",
-			},
-		},
-		map[string]interface{}{
-			"addr": "10.10.0.3:10001",
-			"tls":  true,
-			"rps":  50,
-			"cred": map[string]interface{}{
-				"user":   "user3",
-				"passwd": "temp123!",
-			},
-		},
-	},
+	"client": []interface{}{client1, client2, client3},
 }
 
 func TestSelect(t *testing.T) {
@@ -77,6 +86,13 @@ func TestSelect(t *testing.T) {
 		{
 			Input: ".%service",
 			Want:  "foobar",
+		},
+		{
+			Input: ".%service,.@instances",
+			Want: []interface{}{
+				"foobar",
+				[]interface{}{1, 2, 3},
+			},
 		},
 		{
 			Input: "..%service",
@@ -91,23 +107,15 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			Input: "./[a-z]?e/:number",
-			Want:  3600,
+			Want:  int64(3600),
 		},
 		{
 			Input: "$admin",
-			Want: map[string]interface{}{
-				"name":  "midbel",
-				"email": "midbel@foobar.org",
-				"dob":   time.Date(2020, 10, 12, 14, 0, 0, 0, time.UTC),
-			},
+			Want:  admin,
 		},
 		{
 			Input: "$admin[email ~= /*@*.org/]",
-			Want: map[string]interface{}{
-				"name":  "midbel",
-				"email": "midbel@foobar.org",
-				"dob":   time.Date(2020, 10, 12, 14, 0, 0, 0, time.UTC),
-			},
+			Want:  admin,
 		},
 		{
 			Input: "$admin[(dob >= 2020-01-01 && dob <= 2020-12-31) || email *= \"foobar\"].%(name,email)",
@@ -118,11 +126,7 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			Input: "..$admin[email && (name == \"foobar\" || dob >= 2020-01-01)]",
-			Want: map[string]interface{}{
-				"name":  "midbel",
-				"email": "midbel@foobar.org",
-				"dob":   time.Date(2020, 10, 12, 14, 0, 0, 0, time.UTC),
-			},
+			Want:  admin,
 		},
 		{
 			Input: "..addr",
@@ -137,8 +141,11 @@ func TestSelect(t *testing.T) {
 			},
 		},
 		{
-			Input: "..@groups[addr ^= \"239\"].%addr:string",
-			Want:  "239.192.0.1:31001",
+			Input: "..@groups[(addr ^= \"239\" || addr $= \"31001\") && addr != \":31001\"].%addr:string",
+			Want: []interface{}{
+				"239.192.0.1:31001",
+				"224.0.0.1:31001",
+			},
 		},
 		{
 			Input: ".@client[tls == true].addr:truthy",
@@ -156,19 +163,19 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			Input: "@groups:first",
-			Want: map[string]interface{}{
-				"mode":  0,
-				"addr":  "239.192.0.1:31001",
-				"every": 60,
-			},
+			Want:  grp0,
+		},
+		{
+			Input: "@groups:at(0)",
+			Want:  grp0,
 		},
 		{
 			Input: "@groups:last",
-			Want: map[string]interface{}{
-				"mode":  255,
-				"addr":  "224.0.0.1:31001",
-				"every": 30,
-			},
+			Want:  grp1,
+		},
+		{
+			Input: "@groups:range(5, 10)",
+			Want:  nil,
 		},
 	}
 	for _, d := range data {
