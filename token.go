@@ -2,6 +2,7 @@ package query
 
 import (
 	"fmt"
+	"sort"
 )
 
 const (
@@ -76,6 +77,66 @@ var selectors = map[string]rune{
 	"falsy":    TokSelectFalsy,
 }
 
+var typenames = []struct {
+	Label    string
+	Type     rune
+	Compound bool
+}{
+	{Label: "literal", Type: TokLiteral, Compound: true},
+	{Label: "integer", Type: TokInteger, Compound: true},
+	{Label: "float", Type: TokFloat, Compound: true},
+	{Label: "boolean", Type: TokBool, Compound: true},
+	{Label: "date", Type: TokDate, Compound: true},
+	{Label: "time", Type: TokTime, Compound: true},
+	{Label: "datetime", Type: TokDateTime, Compound: true},
+	{Label: "pattern", Type: TokPattern, Compound: true},
+	{Label: "illegal", Type: TokIllegal, Compound: true},
+	{Label: ":at", Type: TokSelectAt},
+	{Label: ":range", Type: TokSelectRange},
+	{Label: ":first", Type: TokSelectFirst},
+	{Label: ":last", Type: TokSelectLast},
+	{Label: ":int", Type: TokSelectInt},
+	{Label: ":float", Type: TokSelectFloat},
+	{Label: ":number", Type: TokSelectNumber},
+	{Label: ":bool", Type: TokSelectBool},
+	{Label: ":string", Type: TokSelectString},
+	{Label: ":date", Type: TokSelectDate},
+	{Label: ":time", Type: TokSelectTime},
+	{Label: ":datetime", Type: TokSelectDatetime},
+	{Label: ":truthy", Type: TokSelectTruthy},
+	{Label: ":falsy", Type: TokSelectFalsy},
+	{Label: "comma", Type: TokComma},
+	{Label: "and", Type: TokAnd},
+	{Label: "or", Type: TokOr},
+	{Label: "equal", Type: TokEqual},
+	{Label: "notequal", Type: TokNotEqual},
+	{Label: "contains", Type: TokContains},
+	{Label: "match", Type: TokMatch},
+	{Label: "endswith", Type: TokEndsWith},
+	{Label: "startswith", Type: TokStartsWith},
+	{Label: "lesser", Type: TokLesser},
+	{Label: "lesseq", Type: TokLessEq},
+	{Label: "greater", Type: TokGreater},
+	{Label: "greateq", Type: TokGreatEq},
+	{Label: "not", Type: TokNot},
+	{Label: "regular", Type: TokRegular},
+	{Label: "array", Type: TokArray},
+	{Label: "value", Type: TokValue},
+	{Label: "one", Type: TokLevelOne},
+	{Label: "any", Type: TokLevelAny},
+	{Label: "eof", Type: TokEOF},
+	{Label: "beg-expr", Type: TokBegExpr},
+	{Label: "end-expr", Type: TokEndExpr},
+	{Label: "beg-grp", Type: TokBegGrp},
+	{Label: "end-grp", Type: TokEndGrp},
+}
+
+func init() {
+	sort.Slice(typenames, func(i, j int) bool {
+		return typenames[i].Type <= typenames[j].Type
+	})
+}
+
 type Token struct {
 	Literal string
 	Type    rune
@@ -137,100 +198,15 @@ func (t Token) isDone() bool {
 }
 
 func (t Token) String() string {
-	var prefix string
-	switch t.Type {
-	case TokBegExpr, TokBegGrp:
-		return "<begin>"
-	case TokEndExpr, TokEndGrp:
-		return "<end>"
-	case TokComma:
-		return "<comma>"
-	case TokAnd:
-		return "<and>"
-	case TokOr:
-		return "<or>"
-	case TokEqual:
-		return "<equal>"
-	case TokNotEqual:
-		return "<notequal>"
-	case TokContains:
-		return "<contains>"
-	case TokMatch:
-		return "<match>"
-	case TokEndsWith:
-		return "<endwidth>"
-	case TokStartsWith:
-		return "<startwith>"
-	case TokLesser:
-		return "<less>"
-	case TokLessEq:
-		return "<lesseq>"
-	case TokGreater:
-		return "<great>"
-	case TokGreatEq:
-		return "<greateq>"
-	case TokNot:
-		return "<not>"
-	case TokRegular:
-		return "<regular>"
-	case TokArray:
-		return "<array>"
-	case TokValue:
-		return "<value>"
-	case TokLevelOne:
-		return "<one>"
-	case TokLevelAny:
-		return "<any>"
-	case TokEOF:
-		return "<eof>"
-	case TokLiteral:
-		prefix = "literal"
-	case TokInteger:
-		prefix = "integer"
-	case TokFloat:
-		prefix = "float"
-	case TokBool:
-		prefix = "boolean"
-	case TokDate:
-		prefix = "date"
-	case TokTime:
-		prefix = "time"
-	case TokDateTime:
-		prefix = "datetime"
-	case TokPattern:
-		prefix = "pattern"
-	case TokSelectAt:
-		return "<:at>"
-	case TokSelectRange:
-		return "<:range>"
-	case TokSelectFirst:
-		return "<:first>"
-	case TokSelectLast:
-		return "<:last>"
-	case TokSelectInt:
-		return "<:int>"
-	case TokSelectFloat:
-		return "<:float>"
-	case TokSelectNumber:
-		return "<:number>"
-	case TokSelectBool:
-		return "<:bool>"
-	case TokSelectString:
-		return "<:string>"
-	case TokSelectDate:
-		return "<:date>"
-	case TokSelectTime:
-		return "<:time>"
-	case TokSelectDatetime:
-		return "<:datetime>"
-	case TokSelectTruthy:
-		return "<:truthy>"
-	case TokSelectFalsy:
-		return "<:falsy>"
-	case TokIllegal:
-		prefix = "illegal"
-	default:
-		prefix = "unknown"
+	x := sort.Search(len(typenames), func(i int) bool {
+		return t.Type <= typenames[i].Type
+	})
+	if x < len(typenames) && typenames[x].Type == t.Type {
+		str := typenames[x]
+		if str.Compound {
+			return fmt.Sprintf("<%s(%s)>", str.Label, t.Literal)
+		}
+		return fmt.Sprintf("<%s>", str.Label)
 	}
-	return fmt.Sprintf("<%s(%s)>", prefix, t.Literal)
+	return fmt.Sprintf("<unknown(%s)>", t.Literal)
 }
