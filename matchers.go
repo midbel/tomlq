@@ -284,20 +284,19 @@ func isLess(want, got interface{}) (bool, error) {
 		if !ok {
 			return false, castError("string", want)
 		}
-		return strings.Compare(other, val) < 0, nil
+		return strings.Compare(val, other) < 0, nil
 	case int64:
 		other, ok := want.(int64)
 		if !ok {
 			return false, castError("integer", want)
 		}
-		return other < val, nil
+		return val < other, nil
 	case float64:
 		other, ok := want.(float64)
 		if !ok {
 			return false, castError("float", want)
-			return false, fmt.Errorf("%v: can not be casted to float", want)
 		}
-		return other < val, nil
+		return val < other, nil
 	case bool:
 		return false, fmt.Errorf("booleans can only be compared for equality")
 	case time.Time:
@@ -305,7 +304,7 @@ func isLess(want, got interface{}) (bool, error) {
 		if !ok {
 			return false, castError("time", want)
 		}
-		return other.Before(val), nil
+		return val.Before(other), nil
 	}
 	return false, nil
 }

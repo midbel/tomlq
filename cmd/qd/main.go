@@ -18,7 +18,10 @@ const (
 )
 
 func main() {
-	path := flag.Bool("p", false, "print path")
+	var (
+		path = flag.Bool("p", false, "print path")
+		raw  = flag.Bool("r", false, "print raw result")
+	)
 	flag.Parse()
 
 	q, err := query.Parse(flag.Arg(0))
@@ -40,6 +43,10 @@ func main() {
 	case ifi == nil:
 		os.Exit(ExitEmpty)
 	default:
+	}
+	if *raw {
+		fmt.Println(ifi)
+		return
 	}
 	var (
 		root  = filepath.Base(flag.Arg(1))

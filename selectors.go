@@ -46,12 +46,11 @@ type Number struct{}
 
 func (_ Number) Select(ifi interface{}) interface{} {
 	switch ifi.(type) {
-	case int64:
-	case float64:
+	case int64, float64:
+		return ifi
 	default:
 		return nil
 	}
-	return ifi
 }
 
 type Boolean struct{}
