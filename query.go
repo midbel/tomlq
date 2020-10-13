@@ -51,7 +51,16 @@ type Query struct {
 }
 
 func (q Query) Select(ifi interface{}) (interface{}, error) {
-	return q.selectFromInterface(ifi)
+	is, err := q.selectFromInterface(ifi)
+	if err != nil {
+		return nil, err
+	}
+	switch i := is.(type) {
+	case []interface{}:
+		return filterArray(i), nil
+	default:
+		return is, nil
+	}
 }
 
 func (q Query) selectFromInterface(ifi interface{}) (interface{}, error) {
