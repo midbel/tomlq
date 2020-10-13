@@ -76,7 +76,7 @@ func (_ First) Select(ifi interface{}) interface{} {
 	if !ok || len(arr) == 0 {
 		return nil
 	}
-	return arr[:1]
+	return arr[0]
 }
 
 type Last struct{}
