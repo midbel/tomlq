@@ -1,9 +1,5 @@
 package query
 
-import (
-	"fmt"
-)
-
 type Truthy struct{}
 
 func (_ Truthy) Select(ifi interface{}) interface{} {
@@ -83,10 +79,6 @@ func (_ First) Select(ifi interface{}) interface{} {
 	return arr[:1]
 }
 
-func (_ First) String() string {
-	return ":first"
-}
-
 type Last struct{}
 
 func (_ Last) Select(ifi interface{}) interface{} {
@@ -95,10 +87,6 @@ func (_ Last) Select(ifi interface{}) interface{} {
 		return nil
 	}
 	return arr[len(arr)-1:]
-}
-
-func (_ Last) String() string {
-	return ":last"
 }
 
 type At struct {
@@ -111,10 +99,6 @@ func (a At) Select(ifi interface{}) interface{} {
 		return nil
 	}
 	return arr[a.index : a.index+1]
-}
-
-func (a At) String() string {
-	return fmt.Sprintf(":at(index: %d)", a.index)
 }
 
 type Range struct {
@@ -134,8 +118,4 @@ func (r Range) Select(ifi interface{}) interface{} {
 		return arr[r.start:r.end]
 	}
 	return nil
-}
-
-func (r Range) String() string {
-	return fmt.Sprintf(":range(start: %d, end: %d)", r.start, r.end)
 }

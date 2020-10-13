@@ -29,17 +29,6 @@ type Infix struct {
 	op    rune
 }
 
-func (i Infix) String() string {
-	var op string
-	switch i.op {
-	case TokAnd:
-		op = "and"
-	case TokOr:
-		op = "or"
-	}
-	return fmt.Sprintf("%s(left: %s, right: %s)", op, i.left, i.right)
-}
-
 func (i Infix) Match(doc map[string]interface{}) (bool, error) {
 	var (
 		left  bool
@@ -66,10 +55,6 @@ type Has struct {
 	option string
 }
 
-func (h Has) String() string {
-	return fmt.Sprintf("has(%s)", h.option)
-}
-
 func (h Has) Match(doc map[string]interface{}) (bool, error) {
 	_, ok := doc[h.option]
 	return ok, nil
@@ -79,33 +64,6 @@ type Expr struct {
 	option string
 	value  interface{}
 	op     rune
-}
-
-func (e Expr) String() string {
-	var op string
-	switch e.op {
-	case TokEqual:
-		op = "eq"
-	case TokNotEqual:
-		op = "ne"
-	case TokLesser:
-		op = "le"
-	case TokLessEq:
-		op = "lq"
-	case TokGreater:
-		op = "gt"
-	case TokGreatEq:
-		op = "ge"
-	case TokStartsWith:
-		op = "sw"
-	case TokEndsWith:
-		op = "ew"
-	case TokContains:
-		op = "ct"
-	case TokMatch:
-		op = "mt"
-	}
-	return fmt.Sprintf("%s(%s, value: %v)", op, e.option, e.value)
 }
 
 func (e Expr) Match(doc map[string]interface{}) (bool, error) {

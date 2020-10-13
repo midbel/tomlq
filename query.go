@@ -2,7 +2,6 @@ package query
 
 import (
 	"fmt"
-	"strings"
 )
 
 type Value struct {
@@ -232,21 +231,4 @@ func (q Query) applyMatcher(ifi interface{}) (interface{}, error) {
 	default:
 	}
 	return ifi, nil
-}
-
-const qPattern = "query(%s, depth: %s, select: %v, match: %v, next: %v)"
-
-func (q Query) String() string {
-	var depth string
-	switch q.depth {
-	case TokLevelOne:
-		depth = "current"
-	default:
-		depth = "any"
-	}
-	cs := make([]string, len(q.choices))
-	for _, c := range q.choices {
-		cs = append(cs, c.String())
-	}
-	return fmt.Sprintf(qPattern, strings.Join(cs, "|"), depth, q.get, q.match, q.next)
 }
