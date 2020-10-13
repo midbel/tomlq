@@ -74,6 +74,7 @@ func (s *Scanner) scanExpr() Token {
 		return tok
 	}
 	s.skip(isBlank)
+	pos := s.curr
 	switch {
 	case isQuote(s.char):
 		s.scanQuote(&tok)
@@ -90,6 +91,10 @@ func (s *Scanner) scanExpr() Token {
 	default:
 		tok.Type = TokIllegal
 	}
+	if tok.Type == TokIllegal && s.curr > pos {
+		s.reset(pos)
+		tok.Literal = s.scanIllegal(func(r rune) bool { return isControl(r) || isOperator(r) })
+	}
 	return tok
 }
 
@@ -99,6 +104,7 @@ func (s *Scanner) scanDefault() Token {
 		tok.Type = s.char
 		return tok
 	}
+	pos := s.curr
 	switch {
 	case isDigit(s.char):
 		s.scanDigit(&tok)
@@ -115,10 +121,33 @@ func (s *Scanner) scanDefault() Token {
 	default:
 		tok.Type = TokIllegal
 	}
-	if tok.Type == TokComma {
+	switch tok.Type {
+	case TokComma:
 		s.skip(isBlank)
+	case TokIllegal:
+		if s.curr > pos {
+			s.reset(pos)
+			tok.Literal = s.scanIllegal(isControl)
+		}
+	default:
 	}
 	return tok
+}
+
+func (s *Scanner) reset(offset int) {
+	c, z := utf8.DecodeRune(s.buffer[offset:])
+	s.char = c
+	s.curr = offset
+	s.next = offset + z
+}
+
+func (s *Scanner) scanIllegal(isDelim func(r rune) bool) string {
+	var buf bytes.Buffer
+	for !s.isDone() && !isDelim(s.char) {
+		buf.WriteRune(s.char)
+		s.readRune()
+	}
+	return buf.String()
 }
 
 func (s *Scanner) scanUntil(accept func(r rune) bool) (string, bool) {
