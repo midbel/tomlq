@@ -9,13 +9,8 @@ import (
 	"strings"
 
 	"github.com/midbel/query"
+	"github.com/midbel/query/cmd/internal/code"
 	"github.com/midbel/toml"
-)
-
-const (
-	ExitBadQuery int = iota + 1
-	ExitBadDoc
-	ExitEmpty
 )
 
 func main() {
@@ -28,21 +23,21 @@ func main() {
 	q, err := query.Parse(flag.Arg(0))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, flag.Arg(0), err)
-		os.Exit(ExitBadQuery)
+		os.Exit(code.ExitBadQuery)
 	}
 
 	doc, err := decodeDocument(flag.Arg(1))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(ExitBadDoc)
+		os.Exit(code.ExitBadDoc)
 	}
 	ifi, err := q.Select(doc)
 	switch {
 	case err != nil:
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(ExitBadQuery)
+		os.Exit(code.ExitBadQuery)
 	case ifi == nil:
-		os.Exit(ExitEmpty)
+		os.Exit(code.ExitEmpty)
 	default:
 	}
 	if *raw {
@@ -59,6 +54,11 @@ func main() {
 	printResults(strings.TrimSuffix(root, ".toml"), ifi, print)
 }
 
+const (
+	jsonExt = ".json"
+	tomlExt = ".toml"
+)
+
 func decodeDocument(file string) (map[string]interface{}, error) {
 	r, err := os.Open(file)
 	if err != nil {
@@ -67,13 +67,13 @@ func decodeDocument(file string) (map[string]interface{}, error) {
 	defer r.Close()
 
 	var doc = make(map[string]interface{})
-	switch filepath.Ext(file) {
-	case ".toml":
+	switch ext := filepath.Ext(file); strings.ToLower(ext) {
+	case tomlExt:
 		err = toml.Decode(r, &doc)
-	case ".json":
+	case jsonExt:
 		err = json.NewDecoder(r).Decode(&doc)
 	default:
-		err = fmt.Errorf("%s: unsupported file type", filepath.Ext(file))
+		err = fmt.Errorf("%s: unsupported file type", ext)
 	}
 	return doc, err
 }

@@ -15,6 +15,13 @@ func filterArray(arr []interface{}) interface{} {
 	}
 }
 
+func asFloat(ifi interface{}) interface{} {
+	if i, ok := ifi.(int64); ok {
+		return float64(i)
+	}
+	return ifi
+}
+
 func isArray(v interface{}) bool {
 	_, ok := v.([]interface{})
 	return ok

@@ -304,6 +304,7 @@ func (p *Parser) parseValue(op rune) (interface{}, error) {
 		case TokFloat:
 			val, err = strconv.ParseFloat(p.curr.Literal, 64)
 		case TokInteger:
+			// val, err = strconv.ParseFloat(p.curr.Literal, 64)
 			val, err = strconv.ParseInt(p.curr.Literal, 0, 64)
 		case TokTime:
 			for _, str := range timestr {
