@@ -492,10 +492,11 @@ func (s *Scanner) scanOperator(tok *Token) {
 			k = TokIllegal
 		}
 	case bang:
-		k = TokNot
 		if s.nextRune() == equal {
 			s.readRune()
 			k = TokNotEqual
+		} else {
+			k = TokIllegal
 		}
 	case langle:
 		k = TokLesser

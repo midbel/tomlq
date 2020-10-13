@@ -38,7 +38,6 @@ const (
 	TokBegGrp
 	TokEndGrp
 	TokComma
-	TokNot
 	TokSelectAt
 	TokSelectRange
 	TokSelectFirst
@@ -118,7 +117,6 @@ var typenames = []struct {
 	{Label: "lesseq", Type: TokLessEq},
 	{Label: "greater", Type: TokGreater},
 	{Label: "greateq", Type: TokGreatEq},
-	{Label: "not", Type: TokNot},
 	{Label: "regular", Type: TokRegular},
 	{Label: "array", Type: TokArray},
 	{Label: "value", Type: TokValue},
