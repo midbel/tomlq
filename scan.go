@@ -41,14 +41,14 @@ const (
 	newline    = '\n'
 )
 
-var escapes = map[rune]string{
-	backslash: "\\",
-	newline:   "\\n",
-	tab:       "\\t",
-	dquote:    "\"",
-	formfeed:  "\\f",
-	backspace: "\\b",
-	carriage:  "\\r",
+var escapes = map[rune]rune{
+	backslash: backslash,
+	dquote:    dquote,
+	'n':       newline,
+	't':       tab,
+	'f':       formfeed,
+	'b':       backspace,
+	'r':       carriage,
 }
 
 type Scanner struct {
@@ -461,8 +461,8 @@ func (s *Scanner) scanQuote(tok *Token) {
 				buf.WriteRune(backslash)
 				continue
 			}
-			if str, ok := escapes[s.char]; ok {
-				buf.WriteString(str)
+			if char, ok := escapes[s.char]; ok {
+				buf.WriteRune(char)
 				continue
 			} else {
 				break
@@ -578,6 +578,10 @@ func (s *Scanner) scanControl(tok *Token) {
 		if s.nextRune() == dot {
 			s.readRune()
 			k = TokLevelAny
+		}
+		if k == TokLevelAny && s.nextRune() == bang {
+			s.readRune()
+			k = TokLevelGreedy
 		}
 	}
 	tok.Type = k

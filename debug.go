@@ -152,6 +152,8 @@ func debugDepth(depth rune) string {
 		return "one"
 	case TokLevelAny:
 		return "any"
+	case TokLevelGreedy:
+		return "greedy"
 	default:
 		return "unknown"
 	}

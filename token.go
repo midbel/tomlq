@@ -18,6 +18,7 @@ const (
 	TokIllegal
 	TokLevelOne
 	TokLevelAny
+	TokLevelGreedy
 	TokArray
 	TokRegular
 	TokValue
@@ -159,7 +160,12 @@ func (t Token) isType() bool {
 }
 
 func (t Token) isLevel() bool {
-	return t.Type == TokLevelOne || t.Type == TokLevelAny
+	switch t.Type {
+	case TokLevelOne, TokLevelAny, TokLevelGreedy:
+		return true
+	default:
+		return false
+	}
 }
 
 func (t Token) isSelector() bool {
