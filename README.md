@@ -1,6 +1,8 @@
 # query
 
-query has been created in order to make easier to retrieve values from a [toml document](https://toml.io) like [jq](https://stedolan.github.io/jq/) does with JSON document. In some extend, query can also be used to search for values in JSON documents.
+query has been created in order to make easier to retrieve values from a [toml document](https://toml.io) like [jq](https://stedolan.github.io/jq/) does with JSON document.
+
+In some extend, query can also be used to search for values in JSON documents - but it is not its primary objective.
 
 ### Syntax
 
