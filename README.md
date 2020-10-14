@@ -55,8 +55,9 @@ The element part of the query specify the **key** of an element to look for in t
 
 The rules to specify the name of key in the document are more or less identical at the one described in the toml specification:
 
-* bare key(s) allows only alphanumeric, dash and underscore characters. Notes that the first character should be a letter. A bare key can also be an integer but should only be composed of digits.
-* quoted key(s) follow the same rules as basic strings (surrounded by quotation mark ```"```) or literal strings (surrounded by single quote ```'```). Into a quoted key, all the special characters are escaped and loses their special meaning
+* Bare key(s) allow only alphanumeric, dash and underscore characters. Notes that the first character should be a letter.
+* Integer key allow only digit characters.
+* Quoted key(s) follow the same rules as basic strings (surrounded by quotation mark ```"```) or literal strings (surrounded by single quote ```'```). Into a quoted key, all the special characters are escaped and loses their special meaning
 
 query introduce also the possibility to find an element using a simple pattern similar to the one used to glob files in Linux shell. Into a pattern, all the special characters are escaped and loses their special meaning
 
@@ -93,6 +94,24 @@ key
 ```
 
 ##### :selector
+
+Selectors are inspired by CSS selector and are a way to select some specific elements of an array or to select values that are of a specific type.
+
+The syntax of selector is identical to the one of CSS. A selector is introduced with the colon operator ```:```, then follows by the name of the selector and, optionally, a list of arguments surrounded by parenthesis ```()``` and separated by comma ```,```.
+
+Existing selectors are:
+
+* **:first**: select the first element of an array
+* **:last**: select the last element of an array
+* **:at(index)**: select the element at given index of an array
+* **:range([start], [end])**: select all element of an array between [start] and [end]. If start is not specified, the selector select all elements from the beginning of an array up to [end]. If end is not specified, the selector select all elements from [start] to the end of the array
+* **:int**: select a value only if its type is integer
+* **:float**: select a value only if its type is float
+* **:number**: select a value only if its type is integer or float
+* **:bool**: select a value only if its type is boolean
+* **:string**: select a value only if its type is string
+* **:truthy**: select a value only if its value can be considered as truthy. For integer and float, a value is different of 0. For booleans, a value equal to true. For strings, any string with length greater than 0. For array, any array with length greater than 0. For table, any table with at least one key.
+* **:falsy**: the opposite of the truthy selector.
 
 ##### [predicate]
 
@@ -179,3 +198,4 @@ optional   = false
 * comparing value of an option with value of another option somewhere in the same document
 * specify the root element (table, array) from where the query will be executed
 * greedy query
+* specifiy variable in the query with values defined outside of the document and/or the query itself
