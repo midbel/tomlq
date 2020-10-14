@@ -35,7 +35,21 @@ const (
 	slash      = '/'
 	tilde      = '~'
 	backslash  = '\\'
+	formfeed   = '\f'
+	backspace  = '\b'
+	carriage   = '\r'
+	newline    = '\n'
 )
+
+var escapes = map[rune]string{
+	backslash: "\\",
+	newline:   "\\n",
+	tab:       "\\t",
+	dquote:    "\"",
+	formfeed:  "\\f",
+	backspace: "\\b",
+	carriage:  "\\r",
+}
 
 type Scanner struct {
 	buffer []byte
@@ -441,6 +455,19 @@ func (s *Scanner) scanQuote(tok *Token) {
 	)
 	s.readRune()
 	for !s.isDone() && s.char != quote {
+		if quote == dquote && s.char == backslash {
+			s.readRune()
+			if s.char == 'u' {
+				buf.WriteRune(backslash)
+				continue
+			}
+			if str, ok := escapes[s.char]; ok {
+				buf.WriteString(str)
+				continue
+			} else {
+				break
+			}
+		}
 		buf.WriteRune(s.char)
 		s.readRune()
 	}

@@ -16,6 +16,18 @@ func TestScanner(t *testing.T) {
 			},
 		},
 		{
+			Input: "\"\u2665\"",
+			Tokens: []Token{
+				createToken("\u2665", TokLiteral),
+			},
+		},
+		{
+			Input: "\"\\u2665\"",
+			Tokens: []Token{
+				createToken("\\u2665", TokLiteral),
+			},
+		},
+		{
 			Input: "..foo,.bar",
 			Tokens: []Token{
 				createToken("", TokLevelAny),
