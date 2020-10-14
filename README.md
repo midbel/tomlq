@@ -53,6 +53,8 @@ As described above, if none of these operators appears in the query, the query w
 
 The element part of the query specify the **key** of an element to look for in the document. The key can be the name of a table or the name of an option.
 
+This part of the query is the only mandatory part that should be given.
+
 The rules to specify the name of key in the document are more or less identical at the one described in the toml specification:
 
 * Bare key(s) allow only alphanumeric, dash and underscore characters. Notes that the first character should be a letter.
@@ -115,7 +117,70 @@ Existing selectors are:
 
 ##### [predicate]
 
-##### subquery
+To only keep elements of interest, query allows to specify expression that values should match in order to keep the element being checked.
+
+There are two of predicate available with query:
+
+* comparing value of an option with a given value
+* checking presence of an option in a table
+
+To check for the presence of an option, only the name of the option should be given in the predicate, eg:
+
+```
+.element[key]
+```
+
+The rules to specify the name of a key is identical to the one of the toml specification and summarize in the element section.
+
+To compare the value of an option with a specific value, the following operators are available:
+
+* **equal**: ```key == value```
+* **not equal**: ```key != value```
+* **lesser than**: ```key < value```
+* **less or equal**: ```key <= value```
+* **greater than**: ```key > value```
+* **greater or equal**: ```key >= value```
+* **starts with**: ```key ^= value```
+* **ends with**: ```key $= value```
+* **contains**: ```key *= value```
+* **match**: ```key ~= pattern```
+
+The value of the key under test and the value to compare with should be a simple type:
+
+* integer
+* float
+* boolean
+* string
+* datetime/date/time
+
+In some circumstances, it can be helpful to compare the value of key with multiple values. query allow it by surrounding the list of values to compare with in parenthesis ```()```.
+
+The match operator can only be used with a pattern. The same rule of "pattern in element" apply to write a pattern in a predicate.
+
+Both types of predicate can be combined with each other with relational operators. Two are available:
+
+* and: ```&&```
+* or: ```||```
+
+Predicate can also be grouped together to specify the order of evaluation of the expressions.
+
+##### subquery and alternative query
+
+The previous section describe what can be found in a single query. However a query can have a subquery in order to select an element deeper in a document and/or select another part of the same document.
+
+A subquery allow you to select an element found below the matched element of the main query. A subquery can contain exactly the same elements as a regular query can.
+
+eg:
+```
+.parent.child
+```
+
+An alternative query is a query that will select another element in the same document that is already under test. Alternative query are written one after each other and separated by a comma. Alternative queries can contains exactly the same elements as a query alone - even subquery.
+
+eg:
+```
+.element1,.element2,.element3.subelement4
+```
 
 ##### Examples
 

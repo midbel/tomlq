@@ -1,0 +1,33 @@
+package    = "query"
+repository = "https://github.com/midbel/query"
+language   = "go"
+
+[maintainer]
+name = "midbel"
+email = "no-reply@midbel.org"
+
+[[changelog]]
+date = 2020-10-13 21:35:10+02:00
+desc = "edit README with query examples"
+
+[[changelog]]
+date = 2020-10-12 09:00:00+02:00
+desc = "write tests"
+
+[[changelog]]
+date = 2020-10-05 09:00:00+02:00
+desc = "write scanner and parser of query language"
+
+[[changelog]]
+date = 2020-10-03 16:30:00+02:00
+desc = "first draft of query language"
+
+[[changelog]]
+date = 2020-09-01 09:00:00+02:00
+desc = "bash script using grep and sed to retrieve value from toml document"
+
+[[dependency]]
+package = "toml"
+repository = "https://github.com/midbel/toml"
+version    = "0.1.0"
+optional   = "false"
