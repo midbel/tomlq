@@ -45,8 +45,8 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			Input: "..foo.(1234, /[a-z][a-z][a-z][a-z]/)",
-			Depth: TokLevelAny,
+			Input: "..!foo.(1234, /[a-z][a-z][a-z][a-z]/)",
+			Depth: TokLevelGreedy,
 			Choices: []Accepter{
 				createName("foo", 0),
 			},

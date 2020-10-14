@@ -103,11 +103,11 @@ func (q Query) selectFromMap(ifi map[string]interface{}) (interface{}, error) {
 }
 
 func (q Query) selectFromMapWithKey(key Accepter, ifi map[string]interface{}) (interface{}, error) {
-	_, value, err := key.Accept(ifi)
+	label, value, err := key.Accept(ifi)
 	if err != nil {
 		return nil, err
 	}
-	if q.depth == TokLevelAny && value == nil {
+	if (q.depth == TokLevelAny || q.depth == TokLevelGreedy) && value == nil {
 		return q.traverseMap(key, ifi)
 	}
 	if value = q.applySelector(value); value == nil {
@@ -116,7 +116,25 @@ func (q Query) selectFromMapWithKey(key Accepter, ifi map[string]interface{}) (i
 	if value, err = q.applyMatcher(value); value == nil || err != nil {
 		return value, err
 	}
-	return q.applyQuery(value)
+	value, err = q.applyQuery(value)
+	if err != nil {
+		return nil, err
+	}
+	if q.depth == TokLevelGreedy {
+		other := make(map[string]interface{})
+		for k, v := range ifi {
+			if k == label {
+				continue
+			}
+			other[k] = v
+		}
+		vs, err := q.selectFromMapWithKey(key, other)
+		if err != nil {
+			return nil, err
+		}
+		value = []interface{}{value, vs}
+	}
+	return value, err
 }
 
 func (q Query) traverseMap(key Accepter, ifi map[string]interface{}) (interface{}, error) {
