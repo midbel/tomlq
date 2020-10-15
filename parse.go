@@ -245,6 +245,7 @@ func (p *Parser) parseEval() (Func, error) {
 	if !ok {
 		return nil, fmt.Errorf("eval: unknown function %q", p.curr.Literal)
 	}
+	p.next()
 	var args []interface{}
 	if p.curr.Type == TokBegGrp {
 		p.next()
