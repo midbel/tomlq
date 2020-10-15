@@ -236,17 +236,69 @@ func (p *Parser) parseMatcher() (Matcher, error) {
 	return left, err
 }
 
+func (p *Parser) parseEval() (Func, error) {
+	p.next()
+	if p.curr.Type != TokLiteral {
+		return nil, fmt.Errorf("eval: unexpected token %s, want identifier", p.curr)
+	}
+	fn, ok := funcnames[p.curr.Literal]
+	if !ok {
+		return nil, fmt.Errorf("eval: unknown function %q", p.curr.Literal)
+	}
+	var args []interface{}
+	if p.curr.Type == TokBegGrp {
+		p.next()
+		for !p.isDone() && p.curr.Type != TokEndGrp {
+			if !p.curr.isValue() {
+				return nil, fmt.Errorf("eval: unexpected token %s, want 'value'", p.curr)
+			}
+			arg, err := p.convertValue()
+			if err != nil {
+				return nil, err
+			}
+			args = append(args, arg)
+			p.next()
+			switch p.curr.Type {
+			case TokComma:
+				p.next()
+			case TokEndGrp:
+			default:
+				return nil, fmt.Errorf("eval: unexpected token %s, want ')' or ','", p.curr)
+			}
+		}
+		if p.curr.Type != TokEndGrp {
+			return nil, fmt.Errorf("eval: unexpected token %s, want ')'", p.curr)
+		}
+		p.next()
+	}
+	return fn(args), nil
+}
+
 func (p *Parser) parseExpression() (Matcher, error) {
 	var left Matcher
 	if !p.curr.isKey() {
 		return nil, fmt.Errorf("expr: unexpected token %s, want identifier", p.curr)
 	}
-	ident := p.curr
+	var (
+		ident = p.curr
+		eval  Func
+	)
 	p.next()
+	if p.curr.Type == TokLevelOne {
+		fn, err := p.parseEval()
+		if err != nil {
+			return nil, err
+		}
+		if !p.curr.isComparison() {
+			return nil, fmt.Errorf("expr: unexpected token %s, want 'cmp' after function call", p.curr)
+		}
+		eval = fn
+	}
 	if p.curr.isComparison() {
 		e := Expr{
 			option: ident.Literal,
 			op:     p.curr.Type,
+			eval:   eval,
 		}
 		p.next()
 		if !p.curr.isValue() && p.curr.Type != TokBegGrp {
@@ -285,47 +337,50 @@ var datestr = []string{
 	"2006-01-02 15:04:05.000000Z07:00",
 }
 
+func (p *Parser) convertValue() (interface{}, error) {
+	var (
+		val interface{}
+		err error
+	)
+	switch p.curr.Type {
+	case TokPattern:
+		val = p.curr.Literal
+	case TokLiteral:
+		val = p.curr.Literal
+	case TokBool:
+		val, err = strconv.ParseBool(p.curr.Literal)
+	case TokFloat:
+		val, err = strconv.ParseFloat(p.curr.Literal, 64)
+	case TokInteger:
+		val, err = strconv.ParseInt(p.curr.Literal, 0, 64)
+	case TokTime:
+		for _, str := range timestr {
+			val, err = time.Parse(str, p.curr.Literal)
+			if err == nil {
+				break
+			}
+		}
+	case TokDate:
+		val, err = time.Parse("2006-01-02", p.curr.Literal)
+	case TokDateTime:
+		for _, str := range datestr {
+			val, err = time.Parse(str, p.curr.Literal)
+			if err == nil {
+				break
+			}
+		}
+	default:
+		err = fmt.Errorf("unknown value type: %s", p.curr)
+	}
+	return val, err
+}
+
 func (p *Parser) parseValue(op rune) (interface{}, error) {
 	do := func() (interface{}, error) {
-		var (
-			val interface{}
-			err error
-		)
 		if op == TokMatch && p.curr.Type != TokPattern {
 			return nil, fmt.Errorf("value: unexpected token %s, want pattern", p.curr)
 		}
-		switch p.curr.Type {
-		case TokPattern:
-			val = p.curr.Literal
-		case TokLiteral:
-			val = p.curr.Literal
-		case TokBool:
-			val, err = strconv.ParseBool(p.curr.Literal)
-		case TokFloat:
-			val, err = strconv.ParseFloat(p.curr.Literal, 64)
-		case TokInteger:
-			// val, err = strconv.ParseFloat(p.curr.Literal, 64)
-			val, err = strconv.ParseInt(p.curr.Literal, 0, 64)
-		case TokTime:
-			for _, str := range timestr {
-				val, err = time.Parse(str, p.curr.Literal)
-				if err == nil {
-					break
-				}
-			}
-		case TokDate:
-			val, err = time.Parse("2006-01-02", p.curr.Literal)
-		case TokDateTime:
-			for _, str := range datestr {
-				val, err = time.Parse(str, p.curr.Literal)
-				if err == nil {
-					break
-				}
-			}
-		default:
-			err = fmt.Errorf("unknown value type: %s", p.curr)
-		}
-		return val, err
+		return p.convertValue()
 	}
 	if p.curr.isValue() {
 		return do()

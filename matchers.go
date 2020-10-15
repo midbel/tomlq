@@ -62,6 +62,7 @@ func (h Has) Match(doc map[string]interface{}) (bool, error) {
 
 type Expr struct {
 	option string
+	eval   Func
 	value  interface{}
 	op     rune
 }
@@ -71,8 +72,13 @@ func (e Expr) Match(doc map[string]interface{}) (bool, error) {
 	if !ok {
 		return ok, fmt.Errorf("%w: %s", ErrNotFound, e.option)
 	}
-
 	var err error
+	if e.eval != nil {
+		value, err = e.eval(value)
+		if err != nil {
+			return false, err
+		}
+	}
 	switch es := e.value.(type) {
 	case []interface{}:
 		for i := range es {
