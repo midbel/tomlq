@@ -55,17 +55,6 @@ var escapes = map[rune]rune{
 	'r':       carriage,
 }
 
-var constants = map[string]rune{
-	"true":  TokBool,
-	"false": TokBool,
-	"inf":   TokFloat,
-	"+inf":  TokFloat,
-	"-inf":  TokFloat,
-	"nan":   TokFloat,
-	"+nan":  TokFloat,
-	"-nan":  TokFloat,
-}
-
 type Scanner struct {
 	buffer []byte
 	char   rune
@@ -109,14 +98,14 @@ func (s *Scanner) scanExpr() Token {
 		s.scanQuote(&tok)
 	case isOperator(s.char):
 		s.scanOperator(&tok)
-	case isDigit(s.char) || isSign(s.char):
+	case isDigit(s.char) || (isSign(s.char) && isDigit(s.nextRune())):
 		k := s.nextRune()
 		if s.char == zero && (k == hex || k == bin || k == oct) {
 			s.scanBase(&tok)
 		} else {
 			s.scanNumber(&tok)
 		}
-	case isAlpha(s.char):
+	case isAlpha(s.char) || (isSign(s.char) && isLetter(s.nextRune())):
 		s.scanLiteral(&tok)
 	case isControl(s.char):
 		s.scanControl(&tok)

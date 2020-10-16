@@ -58,6 +58,12 @@ const (
 var identifiers = map[string]rune{
 	"true":  TokBool,
 	"false": TokBool,
+	"inf":   TokFloat,
+	"+inf":  TokFloat,
+	"-inf":  TokFloat,
+	"nan":   TokFloat,
+	"+nan":  TokFloat,
+	"-nan":  TokFloat,
 }
 
 var selectors = map[string]rune{
