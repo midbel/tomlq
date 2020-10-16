@@ -43,6 +43,8 @@ const (
 	hex        = 'x'
 	oct        = 'o'
 	bin        = 'b'
+	unicode4   = 'u'
+	unicode8   = 'U'
 )
 
 var escapes = map[rune]rune{
@@ -480,8 +482,8 @@ func (s *Scanner) scanQuote() rune {
 }
 
 func (s *Scanner) scanEscape() rune {
-	if s.char == 'u' || s.char == 'U' {
-		return s.scanUnicodeEscape(s)
+	if s.char == unicode4 || s.char == unicode8 {
+		return s.scanUnicodeEscape()
 	}
 	if char, ok := escapes[s.char]; ok {
 		s.readRune()
@@ -496,7 +498,7 @@ func (s *Scanner) scanUnicodeEscape() rune {
 		offset int32
 		step   int32
 	)
-	if s.char == 'u' {
+	if s.char == unicode4 {
 		step, offset = 4, 12
 	} else {
 		step, offset = 8, 28
