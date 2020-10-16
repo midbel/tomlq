@@ -62,7 +62,7 @@ type Scanner struct {
 	next  int
 
 	buf  bytes.Buffer
-	scan func() Token
+	scan func() rune
 }
 
 func NewScanner(str string) *Scanner {
@@ -76,95 +76,99 @@ func NewScanner(str string) *Scanner {
 
 func (s *Scanner) Scan() Token {
 	defer s.buf.Reset()
-	tok := s.scan()
-	switch tok.Type {
+	kind := s.scan()
+	switch kind {
 	case TokBegExpr:
 		s.scan = s.scanExpr
 	case TokEndExpr:
 		s.scan = s.scanDefault
 	}
-	return tok
+	return Token{
+		Literal: s.literal(),
+		Type:    kind,
+	}
 }
 
-func (s *Scanner) scanExpr() Token {
-	var tok Token
+func (s *Scanner) scanExpr() rune {
 	if s.isDone() {
-		tok.Type = TokIllegal
-		return tok
+		return TokIllegal
 	}
 	s.skip(isBlank)
-	pos := s.curr
+	var (
+		pos = s.curr
+		tok rune
+	)
 	switch {
 	case isQuote(s.char):
-		s.scanQuote(&tok)
+		tok = s.scanQuote()
 	case isOperator(s.char):
-		s.scanOperator(&tok)
+		tok = s.scanOperator()
 	case isDigit(s.char) || (isSign(s.char) && isDigit(s.nextRune())):
 		k := s.nextRune()
 		if s.char == zero && (k == hex || k == bin || k == oct) {
-			s.scanBase(&tok)
+			tok = s.scanBase()
 		} else {
-			s.scanNumber(&tok)
+			tok = s.scanNumber()
 		}
 	case isAlpha(s.char) || (isSign(s.char) && isLetter(s.nextRune())):
-		s.scanLiteral(&tok)
+		tok = s.scanLiteral()
 	case isControl(s.char):
-		s.scanControl(&tok)
+		tok = s.scanControl()
 	case isPattern(s.char):
-		s.scanPattern(&tok)
+		tok = s.scanPattern()
 	default:
-		tok.Type = TokIllegal
+		tok = TokIllegal
 	}
-	if tok.Type == TokIllegal && s.curr > pos {
+	if tok == TokIllegal && s.curr > pos {
 		s.reset(pos)
 		s.scanIllegal(func(r rune) bool { return isControl(r) || isOperator(r) })
-		tok.Literal = s.literal()
 	}
 	return tok
 }
 
-func (s *Scanner) scanDefault() Token {
-	var tok Token
+func (s *Scanner) scanDefault() rune {
 	if s.isDone() {
-		tok.Type = s.char
-		return tok
+		return TokEOF
 	}
-	pos := s.curr
+	var (
+		pos = s.curr
+		tok rune
+	)
 	switch {
 	case isDigit(s.char):
-		s.scanDigit(&tok)
+		tok = s.scanDigit()
 	case isLetter(s.char):
-		s.scanLiteral(&tok)
+		tok = s.scanLiteral()
 	case isQuote(s.char):
-		s.scanQuote(&tok)
+		tok = s.scanQuote()
 	case isControl(s.char):
-		s.scanControl(&tok)
+		tok = s.scanControl()
 	case isPattern(s.char):
-		s.scanPattern(&tok)
+		tok = s.scanPattern()
 	case isSelector(s.char):
-		s.scanSelector(&tok)
+		tok = s.scanSelector()
 	default:
-		tok.Type = TokIllegal
+		tok = TokIllegal
 	}
-	switch tok.Type {
+	switch tok {
 	case TokComma:
 		s.skip(isBlank)
 	case TokIllegal:
 		if s.curr > pos {
 			s.reset(pos)
 			s.scanIllegal(isControl)
-			tok.Literal = s.literal()
 		}
 	default:
 	}
 	return tok
 }
 
-func (s *Scanner) scanIllegal(isDelim func(r rune) bool) {
+func (s *Scanner) scanIllegal(isDelim func(r rune) bool) rune {
 	for !s.isDone() && !isDelim(s.char) {
 		s.writeRune(s.char)
 		s.readRune()
 	}
+	return TokIllegal
 }
 
 func (s *Scanner) scanUntil(accept func(r rune) bool) bool {
@@ -181,21 +185,19 @@ func (s *Scanner) scanUntil(accept func(r rune) bool) bool {
 	return true
 }
 
-func (s *Scanner) scanSelector(tok *Token) {
+func (s *Scanner) scanSelector() rune {
 	s.readRune()
 	for !s.isDone() && isLetter(s.char) {
 		s.writeRune(s.char)
 		s.readRune()
 	}
-	tok.Literal = s.literal()
-	if kind, ok := selectors[tok.Literal]; ok {
-		tok.Type = kind
-	} else {
-		tok.Type = TokIllegal
+	if kind, ok := selectors[s.literal()]; ok {
+		return kind
 	}
+	return TokIllegal
 }
 
-func (s *Scanner) scanBase(tok *Token) {
+func (s *Scanner) scanBase() rune {
 	var accept func(r rune) bool
 	s.writeRune(s.char)
 	s.readRune()
@@ -207,8 +209,7 @@ func (s *Scanner) scanBase(tok *Token) {
 	case bin:
 		accept = isBinary
 	default:
-		tok.Type = TokIllegal
-		return
+		return TokIllegal
 	}
 	s.writeRune(s.char)
 	s.readRune()
@@ -216,9 +217,7 @@ func (s *Scanner) scanBase(tok *Token) {
 		if s.char == underscore {
 			ok := accept(s.prevRune()) && accept(s.nextRune())
 			if !ok {
-				tok.Literal = s.literal()
-				tok.Type = TokIllegal
-				return
+				return TokIllegal
 			}
 			s.readRune()
 		}
@@ -228,42 +227,33 @@ func (s *Scanner) scanBase(tok *Token) {
 		s.writeRune(s.char)
 		s.readRune()
 	}
-	tok.Literal = s.literal()
-	tok.Type = TokInteger
+	return TokInteger
 }
 
-func (s *Scanner) scanNumber(tok *Token) {
+func (s *Scanner) scanNumber() rune {
 	if isSign(s.char) {
 		s.writeRune(s.char)
 		s.readRune()
 	}
 	if s.char == '0' && isDigit(s.nextRune()) {
-		tok.Type = TokIllegal
-		return
+		return TokIllegal
 	}
-	var kind rune
 Loop:
 	for !s.isDone() {
 		switch {
 		case s.char == minus:
-			kind = s.scanDate()
-			break Loop
+			return s.scanDate()
 		case s.char == colon:
-			kind = s.scanTime()
-			break Loop
+			return s.scanTime()
 		case s.char == underscore:
 			ok := isDigit(s.prevRune()) && isDigit(s.nextRune())
 			if !ok {
-				tok.Literal = s.literal()
-				tok.Type = TokIllegal
-				return
+				return TokIllegal
 			}
 		case s.char == dot:
-			kind = s.scanFraction()
-			break Loop
+			return s.scanFraction()
 		case s.char == 'e' || s.char == 'E':
-			kind = s.scanExponent()
-			break Loop
+			return s.scanExponent()
 		case isDigit(s.char):
 			s.writeRune(s.char)
 		default:
@@ -271,11 +261,7 @@ Loop:
 		}
 		s.readRune()
 	}
-	if kind == 0 {
-		kind = TokInteger
-	}
-	tok.Type = kind
-	tok.Literal = s.literal()
+	return TokInteger
 }
 
 func (s *Scanner) scanDate() rune {
@@ -437,51 +423,46 @@ Loop:
 	return TokFloat
 }
 
-func (s *Scanner) scanDigit(tok *Token) {
+func (s *Scanner) scanDigit() rune {
 	ok := s.scanUntil(isDigit)
-	tok.Literal = s.literal()
-	tok.Type = TokInteger
 	if !ok {
-		tok.Type = TokIllegal
+		return TokIllegal
 	}
+	return TokInteger
 }
 
-func (s *Scanner) scanLiteral(tok *Token) {
+func (s *Scanner) scanLiteral() rune {
 	ok := s.scanUntil(isAlpha)
-	tok.Literal = s.literal()
-	tok.Type = TokLiteral
-	if kind, ok := identifiers[tok.Literal]; ok {
-		tok.Type = kind
+	if kind, ok := identifiers[s.literal()]; ok {
+		return kind
 	}
 	if !ok {
-		tok.Type = TokIllegal
+		return TokIllegal
 	}
+	return TokLiteral
 }
 
-func (s *Scanner) scanPattern(tok *Token) {
+func (s *Scanner) scanPattern() rune {
 	s.readRune()
 	for !s.isDone() && s.char != slash {
 		s.writeRune(s.char)
 		s.readRune()
 	}
-	tok.Literal = s.literal()
-	tok.Type = TokPattern
 	if s.char != slash {
-		tok.Type = TokIllegal
-		return
+		return TokIllegal
 	}
 	s.readRune()
+	return TokPattern
 }
 
-func (s *Scanner) scanQuote(tok *Token) {
+func (s *Scanner) scanQuote() rune {
 	quote := s.char
 	s.readRune()
-Loop:
 	for !s.isDone() && s.char != quote {
 		if quote == dquote && s.char == backslash {
-			switch char := scanEscape(s); char {
+			switch char := s.scanEscape(); char {
 			case utf8.RuneError:
-				break Loop
+				return TokIllegal
 			case 0:
 				continue
 			default:
@@ -491,18 +472,16 @@ Loop:
 		s.writeRune(s.char)
 		s.readRune()
 	}
-	tok.Literal = s.literal()
-	tok.Type = TokLiteral
 	if s.char != quote {
-		tok.Type = TokIllegal
-		return
+		return TokIllegal
 	}
 	s.readRune()
+	return TokLiteral
 }
 
-func scanEscape(s *Scanner) rune {
+func (s *Scanner) scanEscape() rune {
 	if s.char == 'u' || s.char == 'U' {
-		return scanUnicodeEscape(s)
+		return s.scanUnicodeEscape(s)
 	}
 	if char, ok := escapes[s.char]; ok {
 		s.readRune()
@@ -511,7 +490,7 @@ func scanEscape(s *Scanner) rune {
 	return utf8.RuneError
 }
 
-func scanUnicodeEscape(s *Scanner) rune {
+func (s *Scanner) scanUnicodeEscape() rune {
 	var (
 		char   int32
 		offset int32
@@ -541,7 +520,7 @@ func scanUnicodeEscape(s *Scanner) rune {
 	return char
 }
 
-func (s *Scanner) scanOperator(tok *Token) {
+func (s *Scanner) scanOperator() rune {
 	var k rune
 	switch s.char {
 	case star:
@@ -612,10 +591,10 @@ func (s *Scanner) scanOperator(tok *Token) {
 		k = TokComma
 	}
 	s.readRune()
-	tok.Type = k
+	return k
 }
 
-func (s *Scanner) scanControl(tok *Token) {
+func (s *Scanner) scanControl() rune {
 	var k rune
 	switch s.char {
 	case lparen:
@@ -645,8 +624,8 @@ func (s *Scanner) scanControl(tok *Token) {
 			k = TokLevelGreedy
 		}
 	}
-	tok.Type = k
 	s.readRune()
+	return k
 }
 
 func (s *Scanner) isDone() bool {
