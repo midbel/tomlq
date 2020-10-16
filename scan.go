@@ -39,6 +39,10 @@ const (
 	backspace  = '\b'
 	carriage   = '\r'
 	newline    = '\n'
+	zero       = '0'
+	hex        = 'x'
+	oct        = 'o'
+	bin        = 'b'
 )
 
 var escapes = map[rune]rune{
@@ -49,6 +53,17 @@ var escapes = map[rune]rune{
 	'f':       formfeed,
 	'b':       backspace,
 	'r':       carriage,
+}
+
+var constants = map[string]rune{
+	"true":  TokBool,
+	"false": TokBool,
+	"inf":   TokFloat,
+	"+inf":  TokFloat,
+	"-inf":  TokFloat,
+	"nan":   TokFloat,
+	"+nan":  TokFloat,
+	"-nan":  TokFloat,
 }
 
 type Scanner struct {
@@ -94,8 +109,13 @@ func (s *Scanner) scanExpr() Token {
 		s.scanQuote(&tok)
 	case isOperator(s.char):
 		s.scanOperator(&tok)
-	case isDigit(s.char) || s.char == minus || s.char == plus:
-		s.scanNumber(&tok)
+	case isDigit(s.char) || isSign(s.char):
+		k := s.nextRune()
+		if s.char == zero && (k == hex || k == bin || k == oct) {
+			s.scanBase(&tok)
+		} else {
+			s.scanNumber(&tok)
+		}
 	case isAlpha(s.char):
 		s.scanLiteral(&tok)
 	case isControl(s.char):
@@ -195,22 +215,35 @@ func (s *Scanner) scanSelector(tok *Token) {
 	}
 }
 
-func (s *Scanner) scanNumberIf(tok *Token, accept func(rune) bool) {
-	var buf bytes.Buffer
-
+func (s *Scanner) scanBase(tok *Token) {
+	var (
+		buf    bytes.Buffer
+		accept func(r rune) bool
+	)
 	buf.WriteRune(s.char)
 	s.readRune()
+	switch s.char {
+	case hex:
+		accept = isHexa
+	case oct:
+		accept = isOctal
+	case bin:
+		accept = isBinary
+	default:
+		tok.Type = TokIllegal
+		return
+	}
 	buf.WriteRune(s.char)
 	s.readRune()
 	for !s.isDone() {
 		if s.char == underscore {
 			ok := accept(s.prevRune()) && accept(s.nextRune())
 			if !ok {
+				tok.Literal = buf.String()
 				tok.Type = TokIllegal
 				return
 			}
 			s.readRune()
-			continue
 		}
 		if !accept(s.char) {
 			break
@@ -223,111 +256,64 @@ func (s *Scanner) scanNumberIf(tok *Token, accept func(rune) bool) {
 }
 
 func (s *Scanner) scanNumber(tok *Token) {
-	var (
-		signed = s.char == plus || s.char == minus
-		pos    = s.curr
-	)
-	if signed {
+	var buf bytes.Buffer
+	if isSign(s.char) {
+		buf.WriteRune(s.char)
 		s.readRune()
 	}
-	if s.char == '0' {
-		switch peek := s.nextRune(); {
-		case peek == 'x':
-			s.scanNumberIf(tok, isHexa)
-		case peek == 'o':
-			s.scanNumberIf(tok, isOctal)
-		case peek == 'b':
-			s.scanNumberIf(tok, isBinary)
-		case isDigit(peek):
-			tok.Type = TokIllegal
-		default:
-		}
-		if tok.Type == TokIllegal || tok.Type == TokInteger {
-			if signed {
-				tok.Type = TokIllegal
-			}
-			return
-		}
-		s.readRune()
+	if s.char == '0' && isDigit(s.nextRune()) {
+		tok.Type = TokIllegal
+		return
 	}
 	var kind rune
-	for kind == 0 && !isBlank(s.char) && !isOperator(s.char) && s.char != rparen && s.char != rsquare {
-		switch s.char {
-		case dot:
-			kind = s.scanFraction()
-		case 'e', 'E':
-			kind = s.scanExponent()
-		case colon:
-			kind = s.scanTime()
-		case minus:
-			kind = s.scanDate()
-		case underscore:
+Loop:
+	for !s.isDone() {
+		switch {
+		case s.char == minus:
+			kind = scanDate(s, &buf)
+			break Loop
+		case s.char == colon:
+			kind = scanTime(s, &buf)
+			break Loop
+		case s.char == underscore:
 			ok := isDigit(s.prevRune()) && isDigit(s.nextRune())
 			if !ok {
-				kind = TokIllegal
+				tok.Literal = buf.String()
+				tok.Type = TokIllegal
+				return
 			}
-			s.readRune()
+		case s.char == dot:
+			kind = scanFraction(s, &buf)
+			break Loop
+		case s.char == 'e' || s.char == 'E':
+			kind = scanExponent(s, &buf)
+			break Loop
+		case isDigit(s.char):
+			buf.WriteRune(s.char)
 		default:
-			s.readRune()
+			break Loop
 		}
+		s.readRune()
 	}
 	if kind == 0 {
 		kind = TokInteger
 	}
 	tok.Type = kind
-	tok.Literal = string(s.buffer[pos:s.curr])
+	tok.Literal = buf.String()
 }
 
-func (s *Scanner) scanFraction() rune {
-	s.readRune()
-	for !s.isDone() {
-		switch {
-		case s.char == underscore:
-			ok := isDigit(s.prevRune()) && isDigit(s.nextRune())
-			if !ok {
-				return TokIllegal
-			}
-		case isDigit(s.char):
-		case s.char == 'e' || s.char == 'E':
-			return s.scanExponent()
-		default:
-			return TokFloat
-		}
-		s.readRune()
-	}
-	return TokFloat
-}
-
-func (s *Scanner) scanExponent() rune {
-	s.readRune()
-	switch {
-	case s.char == minus || s.char == plus || isDigit(s.char):
-		s.readRune()
-	default:
-		return TokIllegal
-	}
-	for isDigit(s.char) {
-		if s.char == underscore {
-			ok := isDigit(s.prevRune()) && isDigit(s.nextRune())
-			if !ok {
-				return TokIllegal
-			}
-		}
-		s.readRune()
-	}
-	return TokFloat
-}
-
-func (s *Scanner) scanDate() rune {
+func scanDate(s *Scanner, buf *bytes.Buffer) rune {
 	scan := func() bool {
 		if s.char != minus {
 			return false
 		}
+		buf.WriteRune(s.char)
 		s.readRune()
 		for i := 0; i < 2; i++ {
 			if !isDigit(s.char) {
 				return false
 			}
+			buf.WriteRune(s.char)
 			s.readRune()
 		}
 		return true
@@ -339,28 +325,31 @@ func (s *Scanner) scanDate() rune {
 		return TokIllegal
 	}
 	if (s.char == space || s.char == 'T') && isDigit(s.nextRune()) {
+		buf.WriteRune(s.char)
 		s.readRune()
-		if kind := s.scanTime(); kind == TokIllegal {
+		if kind := scanTime(s, buf); kind == TokIllegal {
 			return kind
 		}
-		if !s.scanTimezone() {
-			return TokIllegal
+		if kind := scanTimezone(s, buf); kind == TokIllegal {
+			return kind
 		}
 		return TokDateTime
 	}
 	return TokDate
 }
 
-func (s *Scanner) scanTime() rune {
+func scanTime(s *Scanner, buf *bytes.Buffer) rune {
 	scan := func(check bool) bool {
 		if check && s.char != colon {
 			return false
 		}
+		buf.WriteRune(s.char)
 		s.readRune()
 		for i := 0; i < 2; i++ {
 			if !isDigit(s.char) {
 				return false
 			}
+			buf.WriteRune(s.char)
 			s.readRune()
 		}
 		return true
@@ -375,40 +364,101 @@ func (s *Scanner) scanTime() rune {
 		return TokIllegal
 	}
 	if s.char == dot {
+		buf.WriteRune(s.char)
 		s.readRune()
+		n := buf.Len()
 		for isDigit(s.char) {
+			buf.WriteRune(s.char)
 			s.readRune()
+		}
+		if diff := buf.Len() - n; diff > 9 {
+			return TokIllegal
 		}
 	}
 	return TokTime
 }
 
-func (s *Scanner) scanTimezone() bool {
+func scanTimezone(s *Scanner, buf *bytes.Buffer) rune {
 	if s.char == 'Z' {
+		buf.WriteRune(s.char)
 		s.readRune()
-		return true
+		return TokDateTime
 	}
 	if s.char != plus && s.char != minus {
-		return true
+		return TokDateTime
 	}
 	scan := func() bool {
 		for i := 0; i < 2; i++ {
 			if !isDigit(s.char) {
 				return false
 			}
+			buf.WriteRune(s.char)
 			s.readRune()
 		}
 		return true
 	}
+	buf.WriteRune(s.char)
 	s.readRune()
 	if !scan() {
-		return false
+		return TokIllegal
 	}
+	buf.WriteRune(s.char)
 	if s.char != colon {
-		return false
+		return TokIllegal
 	}
 	s.readRune()
-	return scan()
+	if !scan() {
+		return TokIllegal
+	}
+	return TokDateTime
+}
+
+func scanFraction(s *Scanner, buf *bytes.Buffer) rune {
+	buf.WriteRune(s.char)
+	s.readRune()
+Loop:
+	for !s.isDone() {
+		switch {
+		case s.char == 'e' || s.char == 'E':
+			return scanExponent(s, buf)
+		case s.char == underscore:
+			ok := isDigit(s.prevRune()) && isDigit(s.nextRune())
+			if !ok {
+				return TokIllegal
+			}
+		case isDigit(s.char):
+			buf.WriteRune(s.char)
+		default:
+			break Loop
+		}
+		s.readRune()
+	}
+	return TokFloat
+}
+
+func scanExponent(s *Scanner, buf *bytes.Buffer) rune {
+	buf.WriteRune(s.char)
+	s.readRune()
+	if isSign(s.char) {
+		buf.WriteRune(s.char)
+		s.readRune()
+	}
+Loop:
+	for !s.isDone() {
+		switch {
+		case s.char == underscore:
+			ok := isDigit(s.prevRune()) && isDigit(s.nextRune())
+			if !ok {
+				return TokIllegal
+			}
+		case isDigit(s.char):
+			buf.WriteRune(s.char)
+		default:
+			break Loop
+		}
+		s.readRune()
+	}
+	return TokFloat
 }
 
 func (s *Scanner) scanDigit(tok *Token) {
@@ -454,18 +504,16 @@ func (s *Scanner) scanQuote(tok *Token) {
 		quote = s.char
 	)
 	s.readRune()
+Loop:
 	for !s.isDone() && s.char != quote {
 		if quote == dquote && s.char == backslash {
-			s.readRune()
-			if s.char == 'u' {
-				buf.WriteRune(backslash)
+			switch char := scanEscape(s); char {
+			case utf8.RuneError:
+				break Loop
+			case 0:
 				continue
-			}
-			if char, ok := escapes[s.char]; ok {
-				buf.WriteRune(char)
-				continue
-			} else {
-				break
+			default:
+				s.char = char
 			}
 		}
 		buf.WriteRune(s.char)
@@ -478,6 +526,47 @@ func (s *Scanner) scanQuote(tok *Token) {
 		return
 	}
 	s.readRune()
+}
+
+func scanEscape(s *Scanner) rune {
+	if s.char == 'u' || s.char == 'U' {
+		return scanUnicodeEscape(s)
+	}
+	if char, ok := escapes[s.char]; ok {
+		s.readRune()
+		return char
+	}
+	return utf8.RuneError
+}
+
+func scanUnicodeEscape(s *Scanner) rune {
+	var (
+		char   int32
+		offset int32
+		step   int32
+	)
+	if s.char == 'u' {
+		step, offset = 4, 12
+	} else {
+		step, offset = 8, 28
+	}
+	for i := int32(0); i < step; i++ {
+		s.readRune()
+		var x rune
+		switch {
+		case s.char >= '0' && s.char <= '9':
+			x = s.char - '0'
+		case s.char >= 'a' && s.char <= 'f':
+			x = s.char - 'a'
+		case s.char >= 'A' && s.char <= 'F':
+			x = s.char - 'A'
+		default:
+			return utf8.RuneError
+		}
+		char |= x << offset
+		offset -= step
+	}
+	return char
 }
 
 func (s *Scanner) scanOperator(tok *Token) {
@@ -627,6 +716,10 @@ func (s *Scanner) skip(fn func(rune) bool) {
 	for fn(s.char) {
 		s.readRune()
 	}
+}
+
+func isSign(r rune) bool {
+	return r == plus || r == minus
 }
 
 func isBlank(r rune) bool {

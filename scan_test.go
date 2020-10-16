@@ -22,7 +22,7 @@ func TestScanner(t *testing.T) {
 			},
 		},
 		{
-			Input: "\"\\u2665\"",
+			Input: "\"\\\\u2665\"",
 			Tokens: []Token{
 				createToken("\\u2665", TokLiteral),
 			},
@@ -222,7 +222,7 @@ func TestScanner(t *testing.T) {
 				createToken("", TokBegExpr),
 				createToken("bar", TokLiteral),
 				createToken("", TokLessEq),
-				createToken("123_456", TokInteger),
+				createToken("123456", TokInteger),
 				createToken("", TokEndExpr),
 			},
 		},
@@ -281,7 +281,7 @@ func TestScanner(t *testing.T) {
 				createToken("", TokAnd),
 				createToken("float", TokLiteral),
 				createToken("", TokEqual),
-				createToken("0.123_456", TokFloat),
+				createToken("0.123456", TokFloat),
 				createToken("", TokOr),
 				createToken("date", TokLiteral),
 				createToken("", TokNotEqual),
