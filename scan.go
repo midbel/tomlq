@@ -237,8 +237,12 @@ func (s *Scanner) scanNumber() rune {
 		s.writeRune(s.char)
 		s.readRune()
 	}
-	if s.char == '0' && isDigit(s.nextRune()) {
-		return TokIllegal
+	if s.char == zero && isDigit(s.nextRune()) {
+		s.readRune()
+		if isDigit(s.char) && s.nextRune() != colon {
+			return TokIllegal
+		}
+		s.writeRune(zero)
 	}
 Loop:
 	for !s.isDone() {

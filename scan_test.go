@@ -260,13 +260,13 @@ func TestScanner(t *testing.T) {
 			},
 		},
 		{
-			Input: "foo[bar < 10:20:30.789]",
+			Input: "foo[bar < 01:20:30.789]",
 			Tokens: []Token{
 				createToken("foo", TokLiteral),
 				createToken("", TokBegExpr),
 				createToken("bar", TokLiteral),
 				createToken("", TokLesser),
-				createToken("10:20:30.789", TokTime),
+				createToken("01:20:30.789", TokTime),
 				createToken("", TokEndExpr),
 			},
 		},
