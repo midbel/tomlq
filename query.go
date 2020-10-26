@@ -4,12 +4,6 @@ import (
 	"fmt"
 )
 
-type Value struct {
-	Paths []string
-	Label string
-	Value interface{}
-}
-
 type Selector interface {
 	Select(interface{}) interface{}
 }
@@ -70,6 +64,7 @@ func (q Query) selectFromInterface(ifi interface{}) (interface{}, error) {
 	case map[string]interface{}:
 		ifi, err = q.selectFromMap(is)
 	default:
+		return nil, fmt.Errorf("query: can not select from %T", ifi)
 	}
 	return ifi, err
 }
@@ -103,11 +98,11 @@ func (q Query) selectFromMap(ifi map[string]interface{}) (interface{}, error) {
 }
 
 func (q Query) selectFromMapWithKey(key Accepter, ifi map[string]interface{}) (interface{}, error) {
-	label, value, err := key.Accept(ifi)
+	_, value, err := key.Accept(ifi)
 	if err != nil {
 		return nil, err
 	}
-	if (q.depth == TokLevelAny || q.depth == TokLevelGreedy) && value == nil {
+	if q.depth == TokLevelAny && value == nil {
 		return q.traverseMap(key, ifi)
 	}
 	if value = q.applySelector(value); value == nil {
@@ -116,25 +111,7 @@ func (q Query) selectFromMapWithKey(key Accepter, ifi map[string]interface{}) (i
 	if value, err = q.applyMatcher(value); value == nil || err != nil {
 		return value, err
 	}
-	value, err = q.applyQuery(value)
-	if err != nil {
-		return nil, err
-	}
-	if q.depth == TokLevelGreedy {
-		other := make(map[string]interface{})
-		for k, v := range ifi {
-			if k == label {
-				continue
-			}
-			other[k] = v
-		}
-		vs, err := q.selectFromMapWithKey(key, other)
-		if err != nil {
-			return nil, err
-		}
-		value = []interface{}{value, vs}
-	}
-	return value, err
+	return q.applyQuery(value)
 }
 
 func (q Query) traverseMap(key Accepter, ifi map[string]interface{}) (interface{}, error) {
@@ -222,9 +199,6 @@ func (q Query) applyMatcher(ifi interface{}) (interface{}, error) {
 	if q.match == nil {
 		return ifi, nil
 	}
-	if isValue(ifi) {
-		return nil, fmt.Errorf("match: can not apply predicate to value %v (%s)", ifi, q.match)
-	}
 	switch is := ifi.(type) {
 	case map[string]interface{}:
 		if ok, err := q.match.Match(is); !ok || err != nil {
@@ -247,6 +221,7 @@ func (q Query) applyMatcher(ifi interface{}) (interface{}, error) {
 		}
 		ifi = xs
 	default:
+		return nil, fmt.Errorf("query: can not apply predicate to %T", ifi)
 	}
 	return ifi, nil
 }
