@@ -14,10 +14,7 @@ import (
 )
 
 func main() {
-	var (
-		path = flag.Bool("p", false, "print path")
-		raw  = flag.Bool("r", false, "print raw result")
-	)
+	kv := flag.Bool("k", false, "print key/value")
 	flag.Parse()
 
 	q, err := query.Parse(flag.Arg(0))
@@ -32,26 +29,18 @@ func main() {
 		os.Exit(code.ExitBadDoc)
 	}
 	ifi, err := q.Select(doc)
-	switch {
-	case err != nil:
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(code.ExitBadQuery)
-	case ifi == nil:
+	}
+	if len(ifi) == 0 {
 		os.Exit(code.ExitEmpty)
-	default:
 	}
-	if *raw {
-		fmt.Println(ifi)
-		return
-	}
-	var (
-		root  = filepath.Base(flag.Arg(1))
-		print = nokey
-	)
-	if *path {
+	print := nokey
+	if *kv {
 		print = withkey
 	}
-	printResults(strings.TrimSuffix(root, ".toml"), ifi, print)
+	printResults(ifi, print)
 }
 
 const (
@@ -86,19 +75,21 @@ func withkey(key string, value interface{}) {
 	fmt.Printf("%s = %v\n", key, value)
 }
 
-func printResults(key string, value interface{}, print func(string, interface{})) {
+func printResults(rs []query.Result, print func(string, interface{})) {
+	for _, r := range rs {
+		printResult(strings.Join(r.Paths, "."), r.Value, print)
+	}
+}
+
+func printResult(key string, value interface{}, print func(string, interface{})) {
 	switch ifi := value.(type) {
 	case []interface{}:
-		if len(ifi) == 1 {
-			printResults(key, ifi[0], print)
-			return
-		}
 		for j, i := range ifi {
-			printResults(fmt.Sprintf("%s.%d", key, j), i, print)
+			printResult(fmt.Sprintf("%s.%d", key, j), i, print)
 		}
 	case map[string]interface{}:
 		for k, v := range ifi {
-			printResults(fmt.Sprintf("%s.%s", key, k), v, print)
+			printResult(fmt.Sprintf("%s.%s", key, k), v, print)
 		}
 	default:
 		print(key, ifi)
