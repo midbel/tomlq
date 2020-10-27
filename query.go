@@ -4,6 +4,11 @@ import (
 	"fmt"
 )
 
+type Result struct {
+	Paths []string
+	Value interface{}
+}
+
 type Selector interface {
 	Select(interface{}) interface{}
 }
@@ -18,21 +23,21 @@ type Accepter interface {
 }
 
 type Queryer interface {
-	Select(interface{}) (interface{}, error)
+	Select(interface{}) ([]Result, error)
 }
 
 type Queryset []Queryer
 
-func (qs Queryset) Select(ifi interface{}) (interface{}, error) {
-	is := make([]interface{}, 0, len(qs))
+func (qs Queryset) Select(ifi interface{}) ([]Result, error) {
+	rs := make([]Result, 0, len(qs))
 	for _, q := range qs {
-		i, err := q.Select(ifi)
+		r, err := q.Select(ifi)
 		if err != nil {
 			return nil, err
 		}
-		is = append(is, i)
+		rs = append(rs, r...)
 	}
-	return filterArray(is), nil
+	return rs, nil
 }
 
 type Query struct {
@@ -43,62 +48,52 @@ type Query struct {
 	next    Queryer
 }
 
-func (q Query) Select(ifi interface{}) (interface{}, error) {
-	is, err := q.selectFromInterface(ifi)
-	if err != nil {
-		return nil, err
-	}
-	switch i := is.(type) {
-	case []interface{}:
-		return filterArray(i), nil
-	default:
-		return is, nil
-	}
+func (q Query) Select(ifi interface{}) ([]Result, error) {
+	return q.selectFromInterface(ifi)
 }
 
-func (q Query) selectFromInterface(ifi interface{}) (interface{}, error) {
-	var err error
+func (q Query) selectFromInterface(ifi interface{}) ([]Result, error) {
+	var (
+		err error
+		rs  []Result
+	)
 	switch is := ifi.(type) {
 	case []interface{}:
-		ifi, err = q.selectFromArray(is)
+		rs, err = q.selectFromArray(is)
 	case map[string]interface{}:
-		ifi, err = q.selectFromMap(is)
+		rs, err = q.selectFromMap(is)
 	default:
 		return nil, fmt.Errorf("query: can not select from %T", ifi)
 	}
-	return ifi, err
+	return rs, err
 }
 
-func (q Query) selectFromArray(ifi []interface{}) (interface{}, error) {
-	var is []interface{}
+func (q Query) selectFromArray(ifi []interface{}) ([]Result, error) {
+	var rs []Result
 	for _, i := range ifi {
-		j, err := q.selectFromInterface(i)
+		js, err := q.selectFromInterface(i)
 		if err != nil {
 			return nil, err
 		}
-		if j != nil {
-			is = append(is, j)
-		}
+		rs = append(rs, js...)
 	}
-	return filterArray(is), nil
+	return rs, nil
 }
 
-func (q Query) selectFromMap(ifi map[string]interface{}) (interface{}, error) {
-	is := make([]interface{}, 0, len(q.choices))
+func (q Query) selectFromMap(ifi map[string]interface{}) ([]Result, error) {
+	rs := make([]Result, 0, len(q.choices))
 	for _, key := range q.choices {
-		i, err := q.selectFromMapWithKey(key, ifi)
+		r, err := q.selectFromMapWithKey(key, ifi)
 		if err != nil {
 			return nil, err
 		}
-		if i != nil {
-			is = append(is, i)
-		}
+		rs = append(rs, r...)
 	}
-	return filterArray(is), nil
+	return rs, nil
 }
 
-func (q Query) selectFromMapWithKey(key Accepter, ifi map[string]interface{}) (interface{}, error) {
-	_, value, err := key.Accept(ifi)
+func (q Query) selectFromMapWithKey(key Accepter, ifi map[string]interface{}) ([]Result, error) {
+	label, value, err := key.Accept(ifi)
 	if err != nil {
 		return nil, err
 	}
@@ -108,84 +103,29 @@ func (q Query) selectFromMapWithKey(key Accepter, ifi map[string]interface{}) (i
 	if value = q.applySelector(value); value == nil {
 		return nil, nil
 	}
-	if value, err = q.applyMatcher(value); value == nil || err != nil {
-		return value, err
+	rs, err := q.applyMatcher(label, value)
+	if err == nil {
+		rs, err = q.applyQuery(rs)
 	}
-	return q.applyQuery(value)
+	return rs, err
 }
 
-func (q Query) traverseMap(key Accepter, ifi map[string]interface{}) (interface{}, error) {
-	qs := make([]interface{}, 0, len(ifi))
-	for _, is := range ifi {
-		switch i := is.(type) {
-		case []interface{}:
-			vs, err := q.traverseArray(key, i)
-			if err != nil {
-				return nil, err
-			}
-			if len(vs) > 0 {
-				qs = append(qs, vs...)
-			}
-		case map[string]interface{}:
-			v, err := q.selectFromMapWithKey(key, i)
-			if err != nil {
-				return nil, err
-			}
-			if v != nil {
-				qs = append(qs, v)
-			}
-		default:
-		}
-	}
-	return filterArray(qs), nil
-}
-
-func (q Query) traverseArray(key Accepter, is []interface{}) ([]interface{}, error) {
-	isEmpty := func(v interface{}) bool {
-		if v == nil {
-			return true
-		}
-		switch v := v.(type) {
-		default:
-			return false
-		case []interface{}:
-			return len(v) == 0
-		case map[string]interface{}:
-			return len(v) == 0
-		}
-	}
-	qs := make([]interface{}, 0, len(is))
-	for _, i := range is {
-		switch i := i.(type) {
-		case map[string]interface{}:
-			v, err := q.selectFromMapWithKey(key, i)
-			if err != nil {
-				return nil, err
-			}
-			if !isEmpty(v) {
-				qs = append(qs, v)
-			}
-		case []interface{}:
-			vs, err := q.traverseArray(key, i)
-			if err != nil {
-				return nil, err
-			}
-			if len(vs) > 0 {
-				qs = append(qs, vs...)
-			}
-		}
-	}
-	return qs, nil
-}
-
-func (q Query) applyQuery(ifi interface{}) (interface{}, error) {
+func (q Query) applyQuery(rs []Result) ([]Result, error) {
 	if q.next == nil {
-		return ifi, nil
+		return rs, nil
 	}
-	if isValue(ifi) {
-		return nil, fmt.Errorf("query: can not apply query to value %v (%q)", ifi, q.next)
+	xs := make([]Result, 0, len(rs))
+	for _, r := range rs {
+		if isValue(r.Value) {
+			return nil, fmt.Errorf("query: can not apply query to value %v (%q)", r.Value, q.next)
+		}
+		rs, err := q.next.Select(r.Value)
+		if err != nil {
+			return nil, err
+		}
+		xs = append(xs, rs...)
 	}
-	return q.next.Select(ifi)
+	return xs, nil
 }
 
 func (q Query) applySelector(ifi interface{}) interface{} {
@@ -195,17 +135,26 @@ func (q Query) applySelector(ifi interface{}) interface{} {
 	return ifi
 }
 
-func (q Query) applyMatcher(ifi interface{}) (interface{}, error) {
+func (q Query) applyMatcher(label string, ifi interface{}) ([]Result, error) {
 	if q.match == nil {
-		return ifi, nil
+		r := Result{
+			Paths: []string{label},
+			Value: ifi,
+		}
+		return []Result{r}, nil
 	}
 	switch is := ifi.(type) {
 	case map[string]interface{}:
 		if ok, err := q.match.Match(is); !ok || err != nil {
 			return nil, err
 		}
+		r := Result{
+			Paths: []string{label},
+			Value: is,
+		}
+		return []Result{r}, nil
 	case []interface{}:
-		xs := make([]interface{}, 0, len(is))
+		rs := make([]Result, 0, len(is))
 		for _, i := range is {
 			i, ok := i.(map[string]interface{})
 			if !ok {
@@ -216,12 +165,58 @@ func (q Query) applyMatcher(ifi interface{}) (interface{}, error) {
 				return nil, err
 			}
 			if ok {
-				xs = append(xs, i)
+				r := Result{
+					Paths: []string{label},
+					Value: i,
+				}
+				rs = append(rs, r)
 			}
 		}
-		ifi = xs
+		return rs, nil
 	default:
 		return nil, fmt.Errorf("query: can not apply predicate to %T", ifi)
 	}
-	return ifi, nil
+}
+
+func (q Query) traverseMap(key Accepter, ifi map[string]interface{}) ([]Result, error) {
+	rs := make([]Result, 0, len(ifi))
+	for _, is := range ifi {
+		switch i := is.(type) {
+		case []interface{}:
+			vs, err := q.traverseArray(key, i)
+			if err != nil {
+				return nil, err
+			}
+			rs = append(rs, vs...)
+		case map[string]interface{}:
+			vs, err := q.selectFromMapWithKey(key, i)
+			if err != nil {
+				return nil, err
+			}
+			rs = append(rs, vs...)
+		default:
+		}
+	}
+	return rs, nil
+}
+
+func (q Query) traverseArray(key Accepter, is []interface{}) ([]Result, error) {
+	rs := make([]Result, 0, len(is))
+	for _, i := range is {
+		switch i := i.(type) {
+		case map[string]interface{}:
+			vs, err := q.selectFromMapWithKey(key, i)
+			if err != nil {
+				return nil, err
+			}
+			rs = append(rs, vs...)
+		case []interface{}:
+			vs, err := q.traverseArray(key, i)
+			if err != nil {
+				return nil, err
+			}
+			rs = append(rs, vs...)
+		}
+	}
+	return rs, nil
 }

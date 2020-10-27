@@ -4,17 +4,6 @@ import (
 	"time"
 )
 
-func filterArray(arr []interface{}) interface{} {
-	switch len(arr) {
-	case 0:
-		return nil
-	case 1:
-		return arr[0]
-	default:
-		return arr
-	}
-}
-
 func asFloat(ifi interface{}) interface{} {
 	if i, ok := ifi.(int64); ok {
 		return float64(i)

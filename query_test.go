@@ -167,11 +167,11 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			Input: "@groups:at(0)",
-			Want:  grp0,
+			Want:  []interface{}{grp0},
 		},
 		{
 			Input: "@groups:last",
-			Want:  grp1,
+			Want:  []interface{}{grp1},
 		},
 		{
 			Input: "@groups:range(5, 10)",
@@ -184,10 +184,22 @@ func TestSelect(t *testing.T) {
 			t.Errorf("error parsing %s: %s", d.Input, err)
 			continue
 		}
-		got, err := q.Select(doc)
+		rs, err := q.Select(doc)
 		if err != nil {
 			t.Errorf("error fetching data: %s", err)
 			continue
+		}
+		var got interface{}
+		switch n := len(rs); n {
+		case 0:
+		case 1:
+			got = rs[0].Value
+		default:
+			vs := make([]interface{}, 0, n)
+			for _, r := range rs {
+				vs = append(vs, r.Value)
+			}
+			got = vs
 		}
 		if !reflect.DeepEqual(d.Want, got) {
 			t.Errorf("%s: results mismatched!", d.Input)
